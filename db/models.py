@@ -1,27 +1,62 @@
 # db/models.py
-import uuid, datetime as dt
-from sqlalchemy import (Text, String, Boolean, Numeric, DateTime, TIMESTAMP)
+import uuid
+import datetime as dt
+from typing import Optional
+
+from sqlalchemy import Text, String, Boolean, Numeric, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from db.base import Base
+
 
 class Job(Base):
     __tablename__ = "jobs"
-    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4
+    )
+
+    # Required fields
     title: Mapped[str] = mapped_column(Text, nullable=False)
     company: Mapped[str] = mapped_column(Text, nullable=False)
-    city: Mapped[str | None]
-    region: Mapped[str | None]
-    country: Mapped[str | None]
-    remote_flag: Mapped[bool | None]
-    salary_min: Mapped[float | None]
-    salary_max: Mapped[float | None]
-    salary_currency: Mapped[str | None]
-    salary_period: Mapped[str | None]
-    posted_at: Mapped[dt.datetime | None] = mapped_column(TIMESTAMP(timezone=True))
-    source: Mapped[str | None]
-    url: Mapped[str | None] = mapped_column(String, unique=True)
-    description_text: Mapped[str | None]
-    desc_hash: Mapped[str | None]
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
-    updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow)
+
+    # Location defaults
+    city: Mapped[Optional[str]] = mapped_column(Text, default="N/A", server_default="N/A")
+    region: Mapped[Optional[str]] = mapped_column(Text, default="N/A", server_default="N/A")
+    country: Mapped[Optional[str]] = mapped_column(Text, default="N/A", server_default="N/A")
+
+    # Remote flag
+    remote_flag: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+    # Salary info
+    salary_min: Mapped[float] = mapped_column(Numeric, default=0.0, server_default="0")
+    salary_max: Mapped[float] = mapped_column(Numeric, default=0.0, server_default="0")
+    salary_currency: Mapped[str] = mapped_column(Text, default="USD", server_default="USD")
+    salary_period: Mapped[str] = mapped_column(Text, default="yearly", server_default="yearly")
+
+    # Dates
+    posted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), default=None)
+
+    # Source + URLs
+    source: Mapped[str] = mapped_column(Text, default="manual", server_default="manual")
+    url: Mapped[Optional[str]] = mapped_column(String, unique=True)
+
+    # Text fields
+    description_text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    desc_hash: Mapped[str] = mapped_column(Text, default="", server_default="")
+
+    # Audit fields
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime,
+        default=dt.datetime.utcnow,
+        server_default="now()"
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime,
+        default=dt.datetime.utcnow,
+        onupdate=dt.datetime.utcnow,
+        server_default="now()"
+    )
