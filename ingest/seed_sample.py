@@ -1,4 +1,5 @@
-import json, datetime as dt
+import json
+import datetime as dt
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
 from db.models import Job
@@ -21,7 +22,8 @@ def run():
             description_text=it.get("description_text"),
             desc_hash=h
         )
-        db.add(job); added += 1
+        db.add(job)
+        added += 1
     db.commit()
     print(f"Seeded {added} jobs")
 

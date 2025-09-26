@@ -3,9 +3,9 @@ import uuid
 import datetime as dt
 from typing import Optional
 
-from sqlalchemy import Text, String, Boolean, Numeric, DateTime
+from sqlalchemy import Text, String, Boolean, Numeric, DateTime, UniqueConstraint, ForeignKey, Integer, Float
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
 
@@ -60,3 +60,17 @@ class Job(Base):
         onupdate=dt.datetime.utcnow,
         server_default="now()"
     )
+
+class Skill(Base):
+    __tablename__ = "skills"
+    skill_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name_canonical: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    aliases_json: Mapped[str] = mapped_column(Text, default="[]")  # store list as JSON text for now
+
+class JobSkill(Base):
+    __tablename__ = "job_skills"
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.job_id", ondelete="CASCADE"), primary_key=True)
+    skill_id: Mapped[int] = mapped_column(ForeignKey("skills.skill_id", ondelete="CASCADE"), primary_key=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.9)
+    source: Mapped[str] = mapped_column(Text, default="dict_v1")
