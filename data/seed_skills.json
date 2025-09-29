@@ -1,10 +1,10 @@
 [
-  {"name_canonical": "python", "aliases": ["py"], "category": "language"},
+  {"name_canonical": "python", "aliases": ["py", "python3", "python 3"], "category": "language"},
   {"name_canonical": "pandas", "aliases": [], "category": "data"},
   {"name_canonical": "scikit-learn", "aliases": ["sklearn"], "category": "ml"},
   {"name_canonical": "pytorch", "aliases": [], "category": "ml"},
   {"name_canonical": "tensorflow", "aliases": ["tf"], "category": "ml"},
-  {"name_canonical": "sql", "aliases": ["postgres", "mysql", "mssql"], "category": "database"},
+  {"name_canonical": "sql", "aliases": ["postgres", "mysql", "t-sql"], "category": "database"},
   {"name_canonical": "kubernetes", "aliases": ["k8s"], "category": "devops"},
   {"name_canonical": "docker", "aliases": [], "category": "devops"},
   {"name_canonical": "dbt", "aliases": [], "category": "data"},
