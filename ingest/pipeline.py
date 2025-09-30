@@ -110,69 +110,58 @@ async def run_once():
         save_to_db(items)
 
 
-def save_to_db(items: List[Dict[str, Any]]) -> None:
-    # one session for the batch
-    with SessionLocal() as db:
-        build_matcher(db)  # build once per run
+def save_to_db(items, db: Optional[Session] = None) -> int:
+    """Persist items. If `db` is None, manage our own SessionLocal()."""
+    own_session = False
+    if db is None:
+        db = SessionLocal()
+        own_session = True
+
+    try:
+        build_matcher(db)
+
         added = 0
-
         for it in items:
-            try:
-                title = it.get("title")
-                company = it.get("company")
-                if not title:
-                    continue
-                if not company:
-                    # Some lists omit company; derive from source as fallback
-                    company = (it.get("source") or "unknown").replace("_", " ").title()
-                    it["company"] = company
+            # ensure company present
+            if not it.get("company"):
+                it["company"] = it.get("source", "crawl").replace("_", " ").title()
 
-                # dedupe by URL OR by hash of (title, company, description)
-                h = text_hash(title, company, it.get("description_text"))
-                url = it.get("url")
+            # URL dedupe
+            if it.get("url") and db.query(Job).filter_by(url=it["url"]).first():
+                continue
 
-                exists = (
-                    db.query(Job)
-                    .filter(or_(Job.url == url, Job.desc_hash == h))
-                    .first()
-                )
-                if exists:
-                    continue
+            # hash dedupe
+            h = text_hash(it.get("title"), it.get("company"), it.get("description_text"))
+            if db.query(Job).filter_by(desc_hash=h).first():
+                continue
 
-                job = Job(
-                    title=title,
-                    company=company,
-                    city=it.get("city"),
-                    posted_at=it.get("posted_at"),
-                    source=it.get("source", "crawl"),
-                    url=url,
-                    description_text=it.get("description_text", ""),
-                    desc_hash=h,
-                )
-                db.add(job)
-                db.flush()  # get job_id
+            job = Job(
+                title=it["title"],
+                company=it["company"],
+                city=it.get("city"),
+                posted_at=it.get("posted_at"),
+                source=it.get("source", "crawl"),
+                url=it.get("url"),
+                description_text=it.get("description_text", ""),
+                desc_hash=h,
+            )
+            db.add(job)
+            db.flush()  # populates job.job_id
 
-                # skill extraction
-                for name, conf in extract(job.description_text or ""):
-                    sk = db.query(Skill).filter_by(name_canonical=name).first()
-                    if not sk:
-                        # optional: create unseen skills
-                        sk = Skill(name_canonical=name)
-                        db.add(sk)
-                        db.flush()
-                    db.add(
-                        JobSkill(
-                            job_id=str(job.job_id),
-                            skill_id=sk.skill_id,
-                            confidence=conf,
-                            source="spacy_v1",
-                        )
-                    )
+            # skills
+            for name, conf in extract(job.description_text or ""):
+                skill = db.query(Skill).filter_by(name_canonical=name).first()
+                if not skill:
+                    skill = Skill(name_canonical=name)
+                    db.add(skill)
+                    db.flush()
+                db.add(JobSkill(job_id=str(job.job_id), skill_id=skill.skill_id, confidence=conf, source="dict_v1"))
 
-                added += 1
-            except Exception as e:
-                # log and continue; don’t poison the transaction for the whole batch
-                print(f"[warn] save failed for item url={it.get('url')}: {e}")
+            added += 1
 
         db.commit()
         print(f"Ingested {added} jobs")
+        return added
+    finally:
+        if own_session:
+            db.close()
