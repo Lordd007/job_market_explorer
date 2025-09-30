@@ -1,13 +1,732 @@
 [
-  {"name_canonical": "python", "aliases": ["py", "python3", "python 3"], "category": "language"},
-  {"name_canonical": "pandas", "aliases": [], "category": "data"},
-  {"name_canonical": "scikit-learn", "aliases": ["sklearn"], "category": "ml"},
-  {"name_canonical": "pytorch", "aliases": [], "category": "ml"},
-  {"name_canonical": "tensorflow", "aliases": ["tf"], "category": "ml"},
-  {"name_canonical": "sql", "aliases": ["postgres", "mysql", "t-sql"], "category": "database"},
-  {"name_canonical": "kubernetes", "aliases": ["k8s"], "category": "devops"},
-  {"name_canonical": "docker", "aliases": [], "category": "devops"},
-  {"name_canonical": "dbt", "aliases": [], "category": "data"},
-  {"name_canonical": "looker", "aliases": ["looker studio", "data studio"], "category": "bi"},
-  {"name_canonical": "airflow", "aliases": ["apache airflow"], "category": "orchestration"}
+  {
+    "name_canonical": "python",
+    "category": "language",
+    "aliases": [
+      "py"
+    ]
+  },
+  {
+    "name_canonical": "java",
+    "category": "language",
+    "aliases": []
+  },
+  {
+    "name_canonical": "javascript",
+    "category": "language",
+    "aliases": [
+      "js"
+    ]
+  },
+  {
+    "name_canonical": "typescript",
+    "category": "language",
+    "aliases": [
+      "ts"
+    ]
+  },
+  {
+    "name_canonical": "c++",
+    "category": "language",
+    "aliases": [
+      "cpp"
+    ]
+  },
+  {
+    "name_canonical": "c#",
+    "category": "language",
+    "aliases": [
+      "csharp",
+      ".net c#"
+    ]
+  },
+  {
+    "name_canonical": "go",
+    "category": "language",
+    "aliases": [
+      "golang"
+    ]
+  },
+  {
+    "name_canonical": "rust",
+    "category": "language",
+    "aliases": []
+  },
+  {
+    "name_canonical": "scala",
+    "category": "language",
+    "aliases": []
+  },
+  {
+    "name_canonical": "r",
+    "category": "language",
+    "aliases": [
+      "r language"
+    ]
+  },
+  {
+    "name_canonical": "sql",
+    "category": "language",
+    "aliases": [
+      "ansi sql"
+    ]
+  },
+  {
+    "name_canonical": "bash",
+    "category": "language",
+    "aliases": [
+      "shell",
+      "shell scripting",
+      "sh",
+      "zsh"
+    ]
+  },
+  {
+    "name_canonical": "matlab",
+    "category": "language",
+    "aliases": []
+  },
+  {
+    "name_canonical": "swift",
+    "category": "language",
+    "aliases": []
+  },
+  {
+    "name_canonical": "kotlin",
+    "category": "language",
+    "aliases": []
+  },
+  {
+    "name_canonical": "pandas",
+    "category": "data",
+    "aliases": [
+      "pd"
+    ]
+  },
+  {
+    "name_canonical": "numpy",
+    "category": "data",
+    "aliases": [
+      "np",
+      "numPy"
+    ]
+  },
+  {
+    "name_canonical": "scikit-learn",
+    "category": "ml",
+    "aliases": [
+      "sklearn"
+    ]
+  },
+  {
+    "name_canonical": "scipy",
+    "category": "data",
+    "aliases": []
+  },
+  {
+    "name_canonical": "matplotlib",
+    "category": "viz",
+    "aliases": [
+      "mpl"
+    ]
+  },
+  {
+    "name_canonical": "seaborn",
+    "category": "viz",
+    "aliases": []
+  },
+  {
+    "name_canonical": "plotly",
+    "category": "viz",
+    "aliases": [
+      "plotly dash",
+      "dash"
+    ]
+  },
+  {
+    "name_canonical": "jupyter",
+    "category": "data",
+    "aliases": [
+      "jupyter notebook",
+      "notebooks"
+    ]
+  },
+  {
+    "name_canonical": "polars",
+    "category": "data",
+    "aliases": []
+  },
+  {
+    "name_canonical": "vaex",
+    "category": "data",
+    "aliases": []
+  },
+  {
+    "name_canonical": "dask",
+    "category": "data",
+    "aliases": []
+  },
+  {
+    "name_canonical": "apache spark",
+    "category": "bigdata",
+    "aliases": [
+      "spark",
+      "pyspark"
+    ]
+  },
+  {
+    "name_canonical": "apache flink",
+    "category": "bigdata",
+    "aliases": [
+      "flink"
+    ]
+  },
+  {
+    "name_canonical": "airflow",
+    "category": "orchestration",
+    "aliases": [
+      "apache airflow"
+    ]
+  },
+  {
+    "name_canonical": "dbt",
+    "category": "orchestration",
+    "aliases": [
+      "dbt core",
+      "data build tool"
+    ]
+  },
+  {
+    "name_canonical": "prefect",
+    "category": "orchestration",
+    "aliases": []
+  },
+  {
+    "name_canonical": "luigi",
+    "category": "orchestration",
+    "aliases": []
+  },
+  {
+    "name_canonical": "pytorch",
+    "category": "ml",
+    "aliases": [
+      "torch"
+    ]
+  },
+  {
+    "name_canonical": "tensorflow",
+    "category": "ml",
+    "aliases": [
+      "tf"
+    ]
+  },
+  {
+    "name_canonical": "keras",
+    "category": "ml",
+    "aliases": []
+  },
+  {
+    "name_canonical": "xgboost",
+    "category": "ml",
+    "aliases": [
+      "xgb"
+    ]
+  },
+  {
+    "name_canonical": "lightgbm",
+    "category": "ml",
+    "aliases": [
+      "lgbm"
+    ]
+  },
+  {
+    "name_canonical": "catboost",
+    "category": "ml",
+    "aliases": []
+  },
+  {
+    "name_canonical": "transformers",
+    "category": "nlp",
+    "aliases": [
+      "huggingface transformers",
+      "hf transformers"
+    ]
+  },
+  {
+    "name_canonical": "spacy",
+    "category": "nlp",
+    "aliases": [
+      "spaCy"
+    ]
+  },
+  {
+    "name_canonical": "nltk",
+    "category": "nlp",
+    "aliases": []
+  },
+  {
+    "name_canonical": "gensim",
+    "category": "nlp",
+    "aliases": []
+  },
+  {
+    "name_canonical": "opencv",
+    "category": "cv",
+    "aliases": [
+      "open cv",
+      "cv2"
+    ]
+  },
+  {
+    "name_canonical": "onnx",
+    "category": "ml",
+    "aliases": [
+      "onnx runtime",
+      "ort"
+    ]
+  },
+  {
+    "name_canonical": "mlflow",
+    "category": "mlops",
+    "aliases": []
+  },
+  {
+    "name_canonical": "weights & biases",
+    "category": "mlops",
+    "aliases": [
+      "wandb",
+      "weights and biases"
+    ]
+  },
+  {
+    "name_canonical": "ray",
+    "category": "mlops",
+    "aliases": [
+      "ray tune",
+      "ray serve"
+    ]
+  },
+  {
+    "name_canonical": "faiss",
+    "category": "vector",
+    "aliases": []
+  },
+  {
+    "name_canonical": "pgvector",
+    "category": "vector",
+    "aliases": [
+      "postgres vector",
+      "pg vector"
+    ]
+  },
+  {
+    "name_canonical": "aws",
+    "category": "cloud",
+    "aliases": [
+      "amazon web services"
+    ]
+  },
+  {
+    "name_canonical": "azure",
+    "category": "cloud",
+    "aliases": [
+      "microsoft azure"
+    ]
+  },
+  {
+    "name_canonical": "gcp",
+    "category": "cloud",
+    "aliases": [
+      "google cloud",
+      "google cloud platform"
+    ]
+  },
+  {
+    "name_canonical": "aws s3",
+    "category": "cloud",
+    "aliases": [
+      "s3",
+      "amazon s3"
+    ]
+  },
+  {
+    "name_canonical": "aws ec2",
+    "category": "cloud",
+    "aliases": [
+      "ec2"
+    ]
+  },
+  {
+    "name_canonical": "aws lambda",
+    "category": "cloud",
+    "aliases": [
+      "lambda",
+      "serverless lambda"
+    ]
+  },
+  {
+    "name_canonical": "aws glue",
+    "category": "cloud",
+    "aliases": [
+      "glue"
+    ]
+  },
+  {
+    "name_canonical": "aws redshift",
+    "category": "cloud",
+    "aliases": [
+      "redshift"
+    ]
+  },
+  {
+    "name_canonical": "bigquery",
+    "category": "cloud",
+    "aliases": [
+      "google bigquery"
+    ]
+  },
+  {
+    "name_canonical": "dataproc",
+    "category": "cloud",
+    "aliases": [
+      "gcp dataproc"
+    ]
+  },
+  {
+    "name_canonical": "databricks",
+    "category": "bigdata",
+    "aliases": []
+  },
+  {
+    "name_canonical": "postgresql",
+    "category": "database",
+    "aliases": [
+      "postgres",
+      "psql",
+      "postgreSQL"
+    ]
+  },
+  {
+    "name_canonical": "mysql",
+    "category": "database",
+    "aliases": []
+  },
+  {
+    "name_canonical": "sqlite",
+    "category": "database",
+    "aliases": [
+      "sqlite3"
+    ]
+  },
+  {
+    "name_canonical": "snowflake",
+    "category": "database",
+    "aliases": []
+  },
+  {
+    "name_canonical": "redshift",
+    "category": "database",
+    "aliases": [
+      "amazon redshift",
+      "aws redshift"
+    ]
+  },
+  {
+    "name_canonical": "bigtable",
+    "category": "database",
+    "aliases": [
+      "google bigtable"
+    ]
+  },
+  {
+    "name_canonical": "mongodb",
+    "category": "database",
+    "aliases": [
+      "mongo"
+    ]
+  },
+  {
+    "name_canonical": "elasticsearch",
+    "category": "search",
+    "aliases": [
+      "elastic",
+      "es"
+    ]
+  },
+  {
+    "name_canonical": "opensearch",
+    "category": "search",
+    "aliases": []
+  },
+  {
+    "name_canonical": "neo4j",
+    "category": "graph",
+    "aliases": []
+  },
+  {
+    "name_canonical": "redis",
+    "category": "cache",
+    "aliases": []
+  },
+  {
+    "name_canonical": "kafka",
+    "category": "streaming",
+    "aliases": [
+      "apache kafka"
+    ]
+  },
+  {
+    "name_canonical": "rabbitmq",
+    "category": "streaming",
+    "aliases": []
+  },
+  {
+    "name_canonical": "docker",
+    "category": "devops",
+    "aliases": []
+  },
+  {
+    "name_canonical": "kubernetes",
+    "category": "devops",
+    "aliases": [
+      "k8s"
+    ]
+  },
+  {
+    "name_canonical": "helm",
+    "category": "devops",
+    "aliases": []
+  },
+  {
+    "name_canonical": "terraform",
+    "category": "devops",
+    "aliases": [
+      "iac",
+      "infrastructure as code"
+    ]
+  },
+  {
+    "name_canonical": "ansible",
+    "category": "devops",
+    "aliases": []
+  },
+  {
+    "name_canonical": "git",
+    "category": "devops",
+    "aliases": [
+      "gitlab",
+      "github",
+      "bitbucket"
+    ]
+  },
+  {
+    "name_canonical": "ci/cd",
+    "category": "devops",
+    "aliases": [
+      "cicd",
+      "continuous integration",
+      "continuous delivery",
+      "github actions",
+      "gitlab ci"
+    ]
+  },
+  {
+    "name_canonical": "nginx",
+    "category": "infra",
+    "aliases": []
+  },
+  {
+    "name_canonical": "apache httpd",
+    "category": "infra",
+    "aliases": [
+      "apache",
+      "httpd"
+    ]
+  },
+  {
+    "name_canonical": "linux",
+    "category": "os",
+    "aliases": [
+      "ubuntu",
+      "debian",
+      "centos"
+    ]
+  },
+  {
+    "name_canonical": "windows server",
+    "category": "os",
+    "aliases": [
+      "windows"
+    ]
+  },
+  {
+    "name_canonical": "macos",
+    "category": "os",
+    "aliases": [
+      "osx"
+    ]
+  },
+  {
+    "name_canonical": "grpc",
+    "category": "backend",
+    "aliases": []
+  },
+  {
+    "name_canonical": "fastapi",
+    "category": "backend",
+    "aliases": []
+  },
+  {
+    "name_canonical": "flask",
+    "category": "backend",
+    "aliases": []
+  },
+  {
+    "name_canonical": "django",
+    "category": "backend",
+    "aliases": []
+  },
+  {
+    "name_canonical": "node.js",
+    "category": "backend",
+    "aliases": [
+      "nodejs",
+      "node"
+    ]
+  },
+  {
+    "name_canonical": "express",
+    "category": "backend",
+    "aliases": [
+      "express.js",
+      "expressjs"
+    ]
+  },
+  {
+    "name_canonical": "spring boot",
+    "category": "backend",
+    "aliases": [
+      "spring"
+    ]
+  },
+  {
+    "name_canonical": "graphql",
+    "category": "backend",
+    "aliases": []
+  },
+  {
+    "name_canonical": "rest",
+    "category": "backend",
+    "aliases": [
+      "restful",
+      "rest api"
+    ]
+  },
+  {
+    "name_canonical": "tableau",
+    "category": "bi",
+    "aliases": []
+  },
+  {
+    "name_canonical": "power bi",
+    "category": "bi",
+    "aliases": [
+      "powerbi"
+    ]
+  },
+  {
+    "name_canonical": "looker",
+    "category": "bi",
+    "aliases": [
+      "looker studio",
+      "google data studio"
+    ]
+  },
+  {
+    "name_canonical": "superset",
+    "category": "bi",
+    "aliases": [
+      "apache superset"
+    ]
+  },
+  {
+    "name_canonical": "metabase",
+    "category": "bi",
+    "aliases": []
+  },
+  {
+    "name_canonical": "mode",
+    "category": "bi",
+    "aliases": [
+      "mode analytics"
+    ]
+  },
+  {
+    "name_canonical": "kubeflow",
+    "category": "mlops",
+    "aliases": []
+  },
+  {
+    "name_canonical": "sagemaker",
+    "category": "mlops",
+    "aliases": [
+      "amazon sagemaker",
+      "aws sagemaker"
+    ]
+  },
+  {
+    "name_canonical": "airbyte",
+    "category": "etl",
+    "aliases": []
+  },
+  {
+    "name_canonical": "fivetran",
+    "category": "etl",
+    "aliases": []
+  },
+  {
+    "name_canonical": "talend",
+    "category": "etl",
+    "aliases": []
+  },
+  {
+    "name_canonical": "pytest",
+    "category": "testing",
+    "aliases": []
+  },
+  {
+    "name_canonical": "unittest",
+    "category": "testing",
+    "aliases": []
+  },
+  {
+    "name_canonical": "cypress",
+    "category": "testing",
+    "aliases": []
+  },
+  {
+    "name_canonical": "playwright",
+    "category": "testing",
+    "aliases": []
+  },
+  {
+    "name_canonical": "trino",
+    "category": "sql engine",
+    "aliases": [
+      "presto",
+      "presto sql"
+    ]
+  },
+  {
+    "name_canonical": "hive",
+    "category": "sql engine",
+    "aliases": [
+      "apache hive"
+    ]
+  },
+  {
+    "name_canonical": "spark sql",
+    "category": "sql engine",
+    "aliases": []
+  }
 ]

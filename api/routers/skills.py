@@ -8,6 +8,12 @@ from sqlalchemy.orm import Session
 
 from db.session import SessionLocal
 
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from db.session import SessionLocal
+
 router = APIRouter(tags=["skills"])
 
 def get_db():
@@ -17,73 +23,56 @@ def get_db():
     finally:
         db.close()
 
-
-@router.get("/skills/top")
-def top_skills(
-    limit: int = 20,
-    days: int = 90,
-    city: Optional[str] = None,
-    db: Session = Depends(get_db),
-):
-    cutoff = dt.datetime.utcnow() - dt.timedelta(days=days)
-
-    base_sql = """
-        SELECT s.name_canonical AS skill, COUNT(*)::int AS cnt
-        FROM job_skills js
-        JOIN skills s ON s.skill_id = js.skill_id
-        JOIN jobs j   ON j.job_id = js.job_id
-        WHERE COALESCE(j.posted_at::timestamptz, j.created_at::timestamptz) >= (:cutoff)::timestamptz
-    """
-    params = {"cutoff": cutoff, "limit": limit}
-
-    # Only add the city clause if provided
-    if city:
-        base_sql += "\n  AND COALESCE(j.city,'') ILIKE :city_like"
-        params["city_like"] = f"%{city}%"
-
-    base_sql += "\n  GROUP BY 1\n  ORDER BY 2 DESC\n  LIMIT :limit"
-
-    rows = db.execute(text(base_sql), params).mappings().all()
-    return [dict(r) for r in rows]
-
-
 @router.get("/skills/trends")
 def skill_trends(
-    skills: Optional[List[str]] = Query(default=None, alias="skills[]"),
-    weeks: int = 12,
-    city: Optional[str] = None,
+    skill: str = Query(..., description="Canonical skill name (e.g. 'python')"),
+    weeks: int = Query(12, ge=1, le=52),
+    city: Optional[str] = Query(None, description="Optional city filter"),
     db: Session = Depends(get_db),
 ):
-    cutoff = (dt.date.today() - dt.timedelta(weeks=weeks - 1))
-
-    base_sql = """
-        WITH j2 AS (
-            SELECT
-                j.job_id AS job_id,
-                DATE_TRUNC('week', COALESCE(j.posted_at::timestamptz, j.created_at::timestamptz))::date AS week,
-                COALESCE(j.city,'') AS city
-            FROM jobs j
-        )
-        SELECT
-            s.name_canonical AS skill,
-            j2.week AS week,
-            COUNT(*)::int AS count
-        FROM j2
-        JOIN job_skills js ON js.job_id = j2.job_id
-        JOIN skills s     ON s.skill_id = js.skill_id
-        WHERE j2.week >= :cutoff
     """
-    params = {"cutoff": cutoff}
+    Weekly counts for a given skill over the last N weeks.
+    """
+    sql = text("""
+        WITH base AS (
+          SELECT
+            date_trunc('week', COALESCE(j.posted_at, j.created_at))::date AS week,
+            1 AS c
+          FROM job_skills js
+          JOIN jobs j   ON j.job_id = js.job_id
+          JOIN skills s ON s.skill_id = js.skill_id
+          WHERE s.name_canonical = :skill
+            AND COALESCE(j.posted_at::timestamptz, j.created_at::timestamptz)
+                  >= NOW() - (:weeks::int * INTERVAL '7 days')
+            AND (:city IS NULL OR COALESCE(j.city, '') ILIKE :city_like)
+        )
+        SELECT week, SUM(c)::int AS cnt
+        FROM base
+        GROUP BY week
+        ORDER BY week
+    """)
+    rows = db.execute(
+        sql,
+        {
+            "skill": skill,
+            "weeks": weeks,
+            "city": city,
+            "city_like": f"%{city}%" if city else None,
+        },
+    ).mappings().all()
 
-    if city:
-        base_sql += "\n  AND j2.city ILIKE :city_like"
-        params["city_like"] = f"%{city}%"
+    # return continuous weeks (fill gaps with 0)
+    if not rows:
+        return []
 
-    if skills:
-        base_sql += "\n  AND s.name_canonical = ANY(:skills)"
-        params["skills"] = skills
+    by_week = {r["week"].isoformat(): r["cnt"] for r in rows}
+    first = rows[0]["week"]
+    last  = rows[-1]["week"]
 
-    base_sql += "\n  GROUP BY 1, 2\n  ORDER BY week, skill"
-
-    rows = db.execute(text(base_sql), params).mappings().all()
-    return [dict(r) for r in rows]
+    out = []
+    cur = first
+    while cur <= last:
+        k = cur.isoformat()
+        out.append({"week": k, "cnt": by_week.get(k, 0)})
+        cur = (cur + __import__("datetime").timedelta(days=7))
+    return out
