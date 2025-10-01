@@ -28,10 +28,12 @@ def list_jobs(
     List jobs with filters + pagination. Sort newest first.
     """
     # base WHERE pieces
+    interval_str = f"{days} days"
+
     where = [
-        "COALESCE(j.posted_at::timestamptz, j.created_at::timestamptz) >= NOW() - (:days::int * INTERVAL '1 day')"
+        f"COALESCE(j.posted_at::timestamptz, j.created_at::timestamptz) >= NOW() - INTERVAL '{interval_str}'"
     ]
-    params: Dict[str, Any] = {"days": days}
+    params: Dict[str, Any] = {}
 
     if city:
         where.append("COALESCE(j.city,'') ILIKE :city_like")
