@@ -1,8 +1,9 @@
-# ingest/pipeline.py
+# ingest/pipeline.py  (PATCHED)
 import asyncio
 import re
-from datetime import datetime
-from typing import Iterable, List, Dict, Any, Optional
+from datetime import datetime, timedelta
+from typing import Iterable, List, Dict, Any, Optional, Tuple
+import os
 import httpx
 from bs4 import BeautifulSoup
 
@@ -19,12 +20,23 @@ CONCURRENCY = 8
 REQUEST_TIMEOUT = 20.0
 MAX_RETRIES = 3
 RETRY_BACKOFF = 0.75  # seconds
+RATE_LIMIT_SECONDS = 1.0  # be gentle when hitting public endpoints
 
-SOURCES: List[Dict[str, str]] = [
-    # TODO: Replace with boards you’ve confirmed are allowed to fetch
-    {"name": "example_greenhouse", "list_url": "https://boards.greenhouse.io/examplecompany"},
-]
+# --- NEW: helpers ------------------------------------------------------------
 
+def _rate_limit():
+    return asyncio.sleep(RATE_LIMIT_SECONDS)
+
+async def _get_json(client: httpx.AsyncClient, url: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            r = await client.get(url, headers=HEADERS, params=params or {}, timeout=REQUEST_TIMEOUT)
+            r.raise_for_status()
+            return r.json()
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.HTTPStatusError, httpx.TransportError):
+            if attempt == MAX_RETRIES:
+                raise
+            await asyncio.sleep(RETRY_BACKOFF * attempt)
 
 async def fetch(client: httpx.AsyncClient, url: str) -> str:
     for attempt in range(1, MAX_RETRIES + 1):
@@ -37,13 +49,13 @@ async def fetch(client: httpx.AsyncClient, url: str) -> str:
                 raise
             await asyncio.sleep(RETRY_BACKOFF * attempt)
 
+# --- EXISTING: HTML crawl (fallback/explicit only) ---------------------------
 
-async def crawl_source(client: httpx.AsyncClient, src: Dict[str, str]) -> List[Dict[str, str]]:
-    html = await fetch(client, src["list_url"])
+async def crawl_source_html_list(client: httpx.AsyncClient, list_url: str) -> List[Dict[str, str]]:
+    # Only use this for sources you’ve confirmed are allowed to fetch.
+    html = await fetch(client, list_url)
     soup = BeautifulSoup(html, "html.parser")
     jobs: List[Dict[str, str]] = []
-
-    # naive: find all <a> links to job detail pages under /jobs/
     for a in soup.select("a[href*='/jobs/']"):
         title = a.get_text(strip=True)
         href = a.get("href")
@@ -52,15 +64,11 @@ async def crawl_source(client: httpx.AsyncClient, src: Dict[str, str]) -> List[D
         if href.startswith("http"):
             url = href
         else:
-            # best-effort join; Greenhouse links are usually absolute or root-relative
             url = "https://boards.greenhouse.io" + href
-        jobs.append({"title": title, "url": url, "source": src["name"]})
+        jobs.append({"title": title, "url": url, "source": "html"})
     return jobs
 
-
 def _parse_posted_at(soup: BeautifulSoup) -> Optional[datetime]:
-    # TODO Many ATS pages have a "posted" label somewhere; this is just a placeholder
-    # Improve per-source once you pick real boards
     text = soup.get_text(" ", strip=True)
     m = re.search(r"posted\s+on\s+([A-Za-z]{3,9}\s+\d{1,2},\s+\d{4})", text, re.I)
     if m:
@@ -70,45 +78,124 @@ def _parse_posted_at(soup: BeautifulSoup) -> Optional[datetime]:
             pass
     return None
 
-
-async def enrich_job(client: httpx.AsyncClient, job_stub: Dict[str, Any]) -> Dict[str, Any]:
+async def enrich_job_html(client: httpx.AsyncClient, job_stub: Dict[str, Any]) -> Dict[str, Any]:
     html = await fetch(client, job_stub["url"])
     soup = BeautifulSoup(html, "html.parser")
     desc = soup.get_text(separator="\n", strip=True)
-
-    # naive location parsing; customize per source
     loc_el = soup.select_one(".location, .job-location, [data-qa='job-location']")
     city = loc_el.get_text(strip=True) if loc_el else "N/A"
-
     return {
         **job_stub,
-        "description_text": desc[:200000],  # keep size in check
+        "description_text": desc[:200000],
         "city": city,
         "posted_at": _parse_posted_at(soup),
     }
 
+# --- NEW: Greenhouse JSON adapter (per-company) ------------------------------
 
-async def run_once():
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        stubs_nested = await asyncio.gather(*(crawl_source(client, s) for s in SOURCES))
-        stubs = [j for group in stubs_nested for j in group]
+async def greenhouse_company_jobs(client: httpx.AsyncClient, company_slug: str, days: int) -> List[Dict[str, Any]]:
+    # https://boards-api.greenhouse.io/v1/boards/{slug}/jobs
+    url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs"
+    data = await _get_json(client, url, params={"content": "true"})
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    out: List[Dict[str, Any]] = []
+    for j in data.get("jobs", []):
+        posted = j.get("updated_at") or j.get("created_at")
+        posted_dt = None
+        if posted:
+            # "2024-09-01T12:34:56Z"
+            try:
+                posted_dt = datetime.fromisoformat(posted.replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                posted_dt = None
+        if posted_dt and posted_dt < cutoff:
+            continue
 
-        # fetch details with bounded concurrency
-        sem = asyncio.Semaphore(CONCURRENCY)
+        loc = (j.get("location") or {}).get("name") or ""
+        city = (loc.split(",")[0].strip() if loc else None) or None
 
-        async def bound_enrich(stub):
-            async with sem:
-                try:
-                    return await enrich_job(client, stub)
-                except Exception as e:
-                    # Log and skip broken pages; don’t fail the whole run
-                    print(f"[warn] enrich failed for {stub.get('url')}: {e}")
-                    return None
+        out.append({
+            "title": j.get("title", "").strip(),
+            "company": (j.get("offices") or [{}])[0].get("name")
+                       or (j.get("departments") or [{}])[0].get("name")
+                       or "Unknown",
+            "description_text": (j.get("content") or "")[:200000],
+            "url": j.get("absolute_url"),
+            "city": city or "N/A",
+            "posted_at": posted_dt,
+            "source": f"greenhouse:{company_slug}",
+        })
+        await _rate_limit()
+    return out
 
-        details = await asyncio.gather(*(bound_enrich(s) for s in stubs))
-        items = [d for d in details if d]
+# --- NEW: Lever JSON adapter (per-company) -----------------------------------
+
+async def lever_company_jobs(client: httpx.AsyncClient, company_slug: str, days: int) -> List[Dict[str, Any]]:
+    # https://api.lever.co/v0/postings/{slug}?mode=json
+    url = f"https://api.lever.co/v0/postings/{company_slug}"
+    data = await _get_json(client, url, params={"mode": "json"})
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    out: List[Dict[str, Any]] = []
+    for j in data:
+        posted_ms = j.get("createdAt")
+        posted_dt = datetime.utcfromtimestamp(posted_ms / 1000) if posted_ms else None
+        if posted_dt and posted_dt < cutoff:
+            continue
+        loc = (j.get("categories") or {}).get("location") or ""
+        city = (loc.split(",")[0].strip() if loc else None) or None
+        out.append({
+            "title": j.get("text", "").strip(),
+            "company": (j.get("categories") or {}).get("team") or "Unknown",
+            "description_text": (j.get("descriptionPlain") or j.get("description") or "")[:200000],
+            "url": j.get("hostedUrl"),
+            "city": city or "N/A",
+            "posted_at": posted_dt,
+            "source": f"lever:{company_slug}",
+        })
+        await _rate_limit()
+    return out
+
+# --- EXISTING: orchestrate ---------------------------------------------------
+
+async def run_once(source: str = "seed", days: int = 7):
+    async with httpx.AsyncClient(follow_redirects=True, headers=HEADERS, timeout=REQUEST_TIMEOUT) as client:
+
+        items: List[Dict[str, Any]] = []
+
+        if source == "seed":
+            # You already have your seed helper; keep it.
+            from ingest.seed_jobs import iter_seed_jobs
+            items = list(iter_seed_jobs(days=days))
+
+        elif source.startswith("greenhouse:"):
+            slug = source.split(":", 1)[1]
+            items = await greenhouse_company_jobs(client, slug, days)
+
+        elif source.startswith("lever:"):
+            slug = source.split(":", 1)[1]
+            items = await lever_company_jobs(client, slug, days)
+
+        elif source.startswith("html:"):
+            # explicit HTML crawl only when allowed
+            list_url = source.split(":", 1)[1]
+            stubs = await crawl_source_html_list(client, list_url)
+            sem = asyncio.Semaphore(CONCURRENCY)
+
+            async def bound_enrich(stub):
+                async with sem:
+                    try:
+                        return await enrich_job_html(client, stub)
+                    except Exception as e:
+                        print(f"[warn] enrich failed for {stub.get('url')}: {e}")
+                        return None
+
+            details = await asyncio.gather(*(bound_enrich(s) for s in stubs))
+            items = [d for d in details if d]
+
+        else:
+            raise SystemExit(f"Unknown source {source}")
+
         save_to_db(items)
-
 
 def save_to_db(items, db: Optional[Session] = None) -> int:
     """Persist items. If `db` is None, manage our own SessionLocal()."""
@@ -122,7 +209,6 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
 
         added = 0
         for it in items:
-            # ensure company present
             if not it.get("company"):
                 it["company"] = it.get("source", "crawl").replace("_", " ").title()
 
@@ -146,9 +232,8 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 desc_hash=h,
             )
             db.add(job)
-            db.flush()  # populates job.job_id
+            db.flush()
 
-            # skills
             for name, conf in extract(job.description_text or ""):
                 skill = db.query(Skill).filter_by(name_canonical=name).first()
                 if not skill:
@@ -165,3 +250,14 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
     finally:
         if own_session:
             db.close()
+
+# --- CLI entrypoint ----------------------------------------------------------
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--source", default=os.getenv("JME_SOURCE", "seed"),
+                    help="seed | greenhouse:<slug> | lever:<slug> | html:<list_url>")
+    ap.add_argument("--days", type=int, default=int(os.getenv("JME_DAYS", "7")))
+    args = ap.parse_args()
+    asyncio.run(run_once(source=args.source, days=args.days))

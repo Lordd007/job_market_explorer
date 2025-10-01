@@ -22,6 +22,14 @@ export default function Jobs() {
 
   // fetch jobs
   useEffect(() => {
+    console.log("🚀 Attempting to fetch from /api/skills/trends");
+    console.log("Constructed URL:", url);  // 👈 this will reveal the problem
+
+    if (!url || typeof url.toString !== "function") {
+        console.error("Invalid URL:", url);
+        return;
+    }
+
     setLoading(true);
     fetchJSON<JobsResp>("/api/jobs", { q, city, skill, days, page, page_size: 20 })
       .then(setResp)

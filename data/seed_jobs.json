@@ -2,161 +2,221 @@
   {
     "title": "Data Analyst",
     "company": "BlueSky Analytics",
-    "location": "San Francisco, CA",
+    "city": "San Francisco",
+    "region": "CA",
+    "country": "US",
     "posted_at": "2025-09-15",
     "url": "https://jobs.example.com/1",
-    "description_text": "Work with large datasets, build dashboards, and provide insights for decision-making in a fast-growing analytics startup."
+    "description_text": "Work with large datasets, build dashboards, and provide insights for decision-making in a fast-growing analytics startup.",
+    "source": "seed"
   },
   {
     "title": "Software Engineer",
     "company": "TechNova Inc.",
-    "location": "Austin, TX",
+    "city": "Austin",
+    "region": "TX",
+    "country": "US",
     "posted_at": "2025-09-10",
     "url": "https://jobs.example.com/2",
-    "description_text": "Design, build, and maintain scalable web applications using modern frameworks. Collaborate with cross-functional teams."
+    "description_text": "Design, build, and maintain scalable web applications using modern frameworks. Collaborate with cross-functional teams.",
+    "source": "seed"
   },
   {
     "title": "Machine Learning Engineer",
     "company": "AIWorks",
-    "location": "Seattle, WA",
+    "city": "Seattle",
+    "region": "WA",
+    "country": "US",
     "posted_at": "2025-09-12",
     "url": "https://jobs.example.com/3",
-    "description_text": "Develop, deploy, and optimize machine learning models for NLP and computer vision use cases."
+    "description_text": "Develop, deploy, and optimize machine learning models for NLP and computer vision use cases.",
+    "source": "seed"
   },
   {
     "title": "Product Manager",
     "company": "GreenPath Solutions",
-    "location": "Denver, CO",
+    "city": "Denver",
+    "region": "CO",
+    "country": "US",
     "posted_at": "2025-09-08",
     "url": "https://jobs.example.com/4",
-    "description_text": "Own product strategy and roadmap, coordinate with stakeholders, and ensure successful product launches."
+    "description_text": "Own product strategy and roadmap, coordinate with stakeholders, and ensure successful product launches.",
+    "source": "seed"
   },
   {
     "title": "UI/UX Designer",
     "company": "PixelCraft",
-    "location": "New York, NY",
+    "city": "New York",
+    "region": "NY",
+    "country": "US",
     "posted_at": "2025-09-05",
     "url": "https://jobs.example.com/5",
-    "description_text": "Create user-centered designs, conduct usability testing, and deliver polished interfaces for web and mobile."
+    "description_text": "Create user-centered designs, conduct usability testing, and deliver polished interfaces for web and mobile.",
+    "source": "seed"
   },
   {
     "title": "DevOps Engineer",
     "company": "CloudForge",
-    "location": "Remote",
+    "city": "Remote",
+    "region": null,
+    "country": "US",
     "posted_at": "2025-09-02",
     "url": "https://jobs.example.com/6",
-    "description_text": "Automate CI/CD pipelines, monitor infrastructure, and optimize cloud deployments."
+    "description_text": "Automate CI/CD pipelines, monitor infrastructure, and optimize cloud deployments.",
+    "source": "seed"
   },
   {
     "title": "Marketing Specialist",
     "company": "BrightWave Media",
-    "location": "Los Angeles, CA",
+    "city": "Los Angeles",
+    "region": "CA",
+    "country": "US",
     "posted_at": "2025-08-30",
     "url": "https://jobs.example.com/7",
-    "description_text": "Plan and execute marketing campaigns, analyze performance metrics, and grow brand awareness."
+    "description_text": "Plan and execute marketing campaigns, analyze performance metrics, and grow brand awareness.",
+    "source": "seed"
   },
   {
     "title": "Business Analyst",
     "company": "NextGen Systems",
-    "location": "Chicago, IL",
+    "city": "Chicago",
+    "region": "IL",
+    "country": "US",
     "posted_at": "2025-08-28",
     "url": "https://jobs.example.com/8",
-    "description_text": "Gather requirements, write user stories, and translate business needs into technical specifications."
+    "description_text": "Gather requirements, write user stories, and translate business needs into technical specifications.",
+    "source": "seed"
   },
   {
     "title": "Cybersecurity Engineer",
     "company": "SecureNet",
-    "location": "Washington, DC",
+    "city": "Washington",
+    "region": "DC",
+    "country": "US",
     "posted_at": "2025-09-01",
     "url": "https://jobs.example.com/9",
-    "description_text": "Implement and monitor security solutions, conduct vulnerability assessments, and ensure compliance."
+    "description_text": "Implement and monitor security solutions, conduct vulnerability assessments, and ensure compliance.",
+    "source": "seed"
   },
   {
     "title": "Frontend Developer",
     "company": "CodeWave",
-    "location": "Remote",
+    "city": "Remote",
+    "region": null,
+    "country": "US",
     "posted_at": "2025-09-07",
     "url": "https://jobs.example.com/10",
-    "description_text": "Build responsive web interfaces with React and TypeScript, working closely with design and backend teams."
+    "description_text": "Build responsive web interfaces with React and TypeScript, working closely with design and backend teams.",
+    "source": "seed"
   },
   {
     "title": "Data Scientist",
     "company": "Insight AI",
-    "location": "Boston, MA",
+    "city": "Boston",
+    "region": "MA",
+    "country": "US",
     "posted_at": "2025-09-04",
     "url": "https://jobs.example.com/11",
-    "description_text": "Analyze data, build predictive models, and present findings to drive business strategy."
+    "description_text": "Analyze data, build predictive models, and present findings to drive business strategy.",
+    "source": "seed"
   },
   {
     "title": "Project Coordinator",
     "company": "UrbanTech",
-    "location": "San Diego, CA",
+    "city": "San Diego",
+    "region": "CA",
+    "country": "US",
     "posted_at": "2025-09-03",
     "url": "https://jobs.example.com/12",
-    "description_text": "Support project planning, track progress, and ensure deliverables meet deadlines."
+    "description_text": "Support project planning, track progress, and ensure deliverables meet deadlines.",
+    "source": "seed"
   },
   {
     "title": "QA Tester",
     "company": "PlayLab Games",
-    "location": "Austin, TX",
+    "city": "Austin",
+    "region": "TX",
+    "country": "US",
     "posted_at": "2025-09-06",
     "url": "https://jobs.example.com/13",
-    "description_text": "Test video games for bugs, ensure quality standards, and document issues for developers."
+    "description_text": "Test video games for bugs, ensure quality standards, and document issues for developers.",
+    "source": "seed"
   },
   {
     "title": "Operations Manager",
     "company": "BrightEnergy",
-    "location": "Houston, TX",
+    "city": "Houston",
+    "region": "TX",
+    "country": "US",
     "posted_at": "2025-08-27",
     "url": "https://jobs.example.com/14",
-    "description_text": "Oversee daily operations, manage teams, and optimize workflows for efficiency."
+    "description_text": "Oversee daily operations, manage teams, and optimize workflows for efficiency.",
+    "source": "seed"
   },
   {
     "title": "HR Generalist",
     "company": "TalentBridge",
-    "location": "Atlanta, GA",
+    "city": "Atlanta",
+    "region": "GA",
+    "country": "US",
     "posted_at": "2025-09-09",
     "url": "https://jobs.example.com/15",
-    "description_text": "Manage recruitment, onboarding, and employee relations while ensuring compliance with HR policies."
+    "description_text": "Manage recruitment, onboarding, and employee relations while ensuring compliance with HR policies.",
+    "source": "seed"
   },
   {
     "title": "Technical Writer",
     "company": "DocuTech",
-    "location": "Portland, OR",
+    "city": "Portland",
+    "region": "OR",
+    "country": "US",
     "posted_at": "2025-09-11",
     "url": "https://jobs.example.com/16",
-    "description_text": "Create clear, concise technical documentation and guides for software products."
+    "description_text": "Create clear, concise technical documentation and guides for software products.",
+    "source": "seed"
   },
   {
     "title": "Cloud Architect",
     "company": "Nimbus Solutions",
-    "location": "Remote",
+    "city": "Remote",
+    "region": null,
+    "country": "US",
     "posted_at": "2025-09-14",
     "url": "https://jobs.example.com/17",
-    "description_text": "Design cloud infrastructure, advise on cloud strategy, and ensure scalability and security."
+    "description_text": "Design cloud infrastructure, advise on cloud strategy, and ensure scalability and security.",
+    "source": "seed"
   },
   {
     "title": "AI Research Scientist",
     "company": "DeepVision Labs",
-    "location": "Palo Alto, CA",
+    "city": "Palo Alto",
+    "region": "CA",
+    "country": "US",
     "posted_at": "2025-09-13",
     "url": "https://jobs.example.com/18",
-    "description_text": "Conduct cutting-edge research in deep learning, publish papers, and collaborate with product teams."
+    "description_text": "Conduct cutting-edge research in deep learning, publish papers, and collaborate with product teams.",
+    "source": "seed"
   },
   {
     "title": "Sales Representative",
     "company": "EcoHome",
-    "location": "Phoenix, AZ",
+    "city": "Phoenix",
+    "region": "AZ",
+    "country": "US",
     "posted_at": "2025-09-05",
     "url": "https://jobs.example.com/19",
-    "description_text": "Sell eco-friendly home products, build client relationships, and meet monthly sales targets."
+    "description_text": "Sell eco-friendly home products, build client relationships, and meet monthly sales targets.",
+    "source": "seed"
   },
   {
     "title": "IT Support Specialist",
     "company": "ByteCare",
-    "location": "Philadelphia, PA",
+    "city": "Philadelphia",
+    "region": "PA",
+    "country": "US",
     "posted_at": "2025-09-16",
     "url": "https://jobs.example.com/20",
-    "description_text": "Provide technical support to employees, troubleshoot hardware/software issues, and maintain systems."
+    "description_text": "Provide technical support to employees, troubleshoot hardware/software issues, and maintain systems.",
+    "source": "seed"
   }
 ]
