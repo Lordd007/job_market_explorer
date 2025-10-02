@@ -1,0 +1,22 @@
+[
+  {
+    "provider": "greenhouse",
+    "slug": "canonical"
+  },
+  {
+    "provider": "greenhouse",
+    "slug": "cloudflare"
+  },
+  {
+    "provider": "greenhouse",
+    "slug": "coursera"
+  },
+  {
+    "provider": "greenhouse",
+    "slug": "tanium"
+  },
+  {
+    "provider": "greenhouse",
+    "slug": "shelf"
+  }
+]

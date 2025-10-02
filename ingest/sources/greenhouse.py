@@ -1,48 +1,39 @@
-import time, json, datetime as dt
-from typing import Iterable
-import requests
+from __future__ import annotations
+import time, requests
+from typing import Iterable, Dict, Any, Optional
 from .base import SourceAdapter, JobDoc
 
 class Greenhouse(SourceAdapter):
-    def __init__(self, company_slug: str):
-        self.name = f"greenhouse:{company_slug}"
-        self.company_slug = company_slug
-        self.base = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs"
+    name = "greenhouse"
+    API_BASE = "https://boards-api.greenhouse.io/v1/boards"
 
-    def fetch(self, days: int = 7) -> Iterable[JobDoc]:
-        cutoff = dt.datetime.utcnow() - dt.timedelta(days=days)
-        params = {"content": "true"}  # include full descriptions when available
-        headers = {"User-Agent": "JobMarketExplorer/0.1"}
-        r = requests.get(self.base, params=params, headers=headers, timeout=20)
+    def _valid(self, slug: str) -> bool:
+        try:
+            r = requests.get(f"{self.API_BASE}/{slug}/jobs", timeout=20)
+            return r.status_code == 200
+        except requests.RequestException:
+            return False
+
+    def resolve_board(self, company: str, candidates: Iterable[str]) -> Optional[str]:
+        for c in candidates:
+            if self._valid(c):
+                return c
+            time.sleep(self.request_delay)
+        return None
+
+    def fetch_jobs(self, board_id: str):
+        r = requests.get(f"{self.API_BASE}/{board_id}/jobs", timeout=30)
         r.raise_for_status()
-        data = r.json()
-        for j in data.get("jobs", []):
-            posted = j.get("updated_at") or j.get("created_at")
-            if posted:
-                try:
-                    posted_dt = dt.datetime.fromisoformat(posted.replace("Z","+00:00")).replace(tzinfo=None)
-                except Exception:
-                    posted_dt = None
-            else:
-                posted_dt = None
-            if posted_dt and posted_dt < cutoff:
-                continue
-            # normalize locations
-            loc = (j.get("location") or {}).get("name") or ""
-            city, region, country = None, None, None
-            parts = [p.strip() for p in loc.split(",") if p.strip()]
-            if parts:
-                city = parts[0] if parts else None
-                if len(parts) >= 2: region = parts[1]
-                if len(parts) >= 3: country = parts[-1]
+        return r.json().get("jobs", [])
 
-            yield JobDoc(
-                title=j.get("title","").strip(),
-                company=(j.get("offices") or [{}])[0].get("name") or j.get("departments",[{}])[0].get("name") or "",
-                description_text=(j.get("content") or ""),
-                url=j.get("absolute_url"),
-                city=city, region=region, country=country,
-                posted_at_iso=posted,
-                source=self.name
-            )
-            time.sleep(1.0)  # gentle rate limit
+    def normalize(self, board_id: str, j: Dict[str, Any]) -> JobDoc:
+        return JobDoc(
+            board_id=board_id,
+            job_id=str(j["id"]),
+            title=j.get("title",""),
+            location=(j.get("location") or {}).get("name",""),
+            absolute_url=j.get("absolute_url",""),
+            departments="; ".join(d["name"] for d in j.get("departments",[])),
+            offices="; ".join(o["name"] for o in j.get("offices",[])),
+            updated_at=j.get("updated_at",""),
+        )
