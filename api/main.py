@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routers import jobs, skills
+from api import errors
 
 app = FastAPI(title="Job Market Explorer")
 
@@ -22,3 +23,4 @@ def health():
 
 app.include_router(jobs.router, prefix="/api")
 app.include_router(skills.router, prefix="/api")
+errors.install(app)

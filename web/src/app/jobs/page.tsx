@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { fetchJSON } from "@/lib/api";
+import { useRouter, useSearchParams } from "next/navigation";
+import { fetchJSON, apiUrl } from "@/lib/api";
 import { ALL_CITIES } from "@/data/cities";
 
 type Job = {
@@ -9,35 +10,80 @@ type Job = {
   posted_at: string | null; created_at: string; url: string | null;
 };
 type JobsResp = { total: number; page: number; page_size: number; items: Job[] };
+type SortMode = "newest" | "title" | "company";
 
 export default function Jobs() {
+  const router = useRouter();
+  const params = useSearchParams();
+
+  // ── filters / state ───────────────────────────────────────────────────────────
+  // debounced text: qInput (controlled input) → q (used for fetch)
+  const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [skill, setSkill] = useState("");
   const [suggest, setSuggest] = useState<string[]>([]);
   const [city, setCity] = useState("");
   const [days, setDays] = useState(90);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortMode>("newest");
+
   const [resp, setResp] = useState<JobsResp | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // fetch jobs
+  // ── hydrate filters from URL on first mount ───────────────────────────────────
   useEffect(() => {
-    console.log("🚀 Attempting to fetch from /api/skills/trends");
-    console.log("Constructed URL:", url);  // 👈 this will reveal the problem
+    const q0 = params.get("q") ?? "";
+    const city0 = params.get("city") ?? "";
+    const skill0 = params.get("skill") ?? "";
+    const days0 = Number(params.get("days") ?? 90);
+    const page0 = Number(params.get("page") ?? 1);
+    const sort0 = (params.get("sort") as SortMode) ?? "newest";
 
-    if (!url || typeof url.toString !== "function") {
-        console.error("Invalid URL:", url);
-        return;
-    }
+    setQInput(q0); setQ(q0);
+    setCity(city0); setSkill(skill0);
+    setDays(days0); setPage(page0);
+    setSort(sort0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // ── persist filters to URL (shallow) ─────────────────────────────────────────
+  useEffect(() => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (city) sp.set("city", city);
+    if (skill) sp.set("skill", skill);
+    if (days) sp.set("days", String(days));
+    if (page) sp.set("page", String(page));
+    if (sort && sort !== "newest") sp.set("sort", sort);
+    router.replace(`/jobs?${sp.toString()}`, { scroll: false });
+  }, [q, city, skill, days, page, sort, router]);
+
+  // ── debounce search input → q ────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(qInput); setPage(1); }, 250);
+    return () => clearTimeout(t);
+  }, [qInput]);
+
+  // ── fetch jobs ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const ac = new AbortController();
     setLoading(true);
+    setError(null);
+
+    // optional: log fully built URL for debugging
+    // const u = apiUrl("/api/jobs", { q, city, skill, days, page, page_size: 20 });
+    // console.log("GET", u.toString());
+
     fetchJSON<JobsResp>("/api/jobs", { q, city, skill, days, page, page_size: 20 })
-      .then(setResp)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then((data) => { if (!ac.signal.aborted) setResp(data); })
+      .catch((e) => { if (!ac.signal.aborted) setError(String(e)); })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false); });
+
+    return () => ac.abort();
   }, [q, city, skill, days, page]);
 
-  // skill typeahead
+  // ── skill typeahead ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!skill || skill.length < 2) { setSuggest([]); return; }
     const t = setTimeout(() => {
@@ -48,10 +94,22 @@ export default function Jobs() {
     return () => clearTimeout(t);
   }, [skill]);
 
-  const totalPages = useMemo(() =>
-    resp ? Math.max(1, Math.ceil(resp.total / (resp.page_size || 20))) : 1,
-  [resp]);
+  // ── derived: client-side sort & pagination label ─────────────────────────────
+  const totalPages = useMemo(
+    () => (resp ? Math.max(1, Math.ceil(resp.total / (resp.page_size || 20))) : 1),
+    [resp]
+  );
 
+  const items = useMemo(() => {
+    if (!resp) return [];
+    const out = [...resp.items];
+    if (sort === "title") out.sort((a,b)=>a.title.localeCompare(b.title));
+    else if (sort === "company") out.sort((a,b)=>a.company.localeCompare(b.company));
+    // newest = API order
+    return out;
+  }, [resp, sort]);
+
+  // ── UI ───────────────────────────────────────────────────────────────────────
   return (
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold">Browse Jobs</h1>
@@ -60,7 +118,7 @@ export default function Jobs() {
         <div className="flex flex-col">
           <label className="text-sm opacity-70">Search</label>
           <input
-            value={q} onChange={e => { setPage(1); setQ(e.target.value); }}
+            value={qInput} onChange={e => setQInput(e.target.value)}
             placeholder="title, company, description…"
             className="bg-transparent border rounded px-3 py-2 min-w-[260px]"
           />
@@ -111,11 +169,39 @@ export default function Jobs() {
             {[7, 14, 30, 60, 90, 180, 365].map(d => <option key={d} value={d}>{d} days</option>)}
           </select>
         </div>
+
+        <div className="flex flex-col">
+          <label className="text-sm opacity-70">Sort</label>
+          <select
+            value={sort}
+            onChange={e => setSort(e.target.value as SortMode)}
+            className="bg-transparent border rounded px-3 py-2"
+          >
+            <option value="newest">Newest</option>
+            <option value="title">Title (A→Z)</option>
+            <option value="company">Company (A→Z)</option>
+          </select>
+        </div>
       </div>
 
-      {loading && <div className="opacity-70">Loading…</div>}
+      {error && <div className="text-red-400">Error: {error}</div>}
 
-      {!loading && resp && (
+      {loading && (
+        <ul className="divide-y divide-neutral-800 rounded border animate-pulse">
+          {Array.from({length:6}).map((_,i)=>(
+            <li key={i} className="p-4">
+              <div className="h-4 w-48 bg-neutral-800 rounded mb-2" />
+              <div className="h-3 w-32 bg-neutral-900 rounded" />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!loading && resp && resp.total === 0 && (
+        <div className="opacity-70">No jobs found. Try clearing filters or increasing the day window.</div>
+      )}
+
+      {!loading && resp && resp.total > 0 && (
         <>
           <div className="text-sm opacity-70">
             Showing {(resp.page-1)*resp.page_size + 1}–
@@ -123,7 +209,7 @@ export default function Jobs() {
           </div>
 
           <ul className="divide-y divide-neutral-800 rounded border">
-            {resp.items.map((j) => (
+            {items.map((j) => (
               <li key={j.job_id} className="p-4 hover:bg-neutral-900">
                 <div className="flex justify-between gap-4 flex-wrap">
                   <div>
