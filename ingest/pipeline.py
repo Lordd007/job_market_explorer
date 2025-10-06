@@ -15,6 +15,9 @@ from db.models import Job, Skill, JobSkill
 from core.hashing import text_hash
 from ingest.skills_extract import build_matcher, extract
 
+from ingest.dedupe import canonicalize_url, normalize_text, sha256_bytes
+from sqlalchemy.exc import IntegrityError
+
 HEADERS = {"User-Agent": "JobMarketExplorer/0.1 (academic/portfolio use)"}
 CONCURRENCY = 8
 REQUEST_TIMEOUT = 20.0
@@ -213,12 +216,40 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 it["company"] = it.get("source", "crawl").replace("_", " ").title()
 
             # URL dedupe
-            if it.get("url") and db.query(Job).filter_by(url=it["url"]).first():
+            canon_url = canonicalize_url(it.get("url", ""))
+            url_hash = sha256_bytes(canon_url) if canon_url else None
+            # 1) prefer url_hash if present
+            if url_hash and db.query(Job).filter_by(url_hash=url_hash).first():
+                continue
+            # 2) transition safety: also check by URL (existing rows may have url_hash=NULL)
+            raw_url = it.get("url")
+            existing = None
+            if canon_url or raw_url:
+                existing = db.query(Job).filter( or_(Job.url == canon_url, Job.url == raw_url)).first()
+                if existing:
+                    # backfill missing hashes on the existing row, then skip
+                    if url_hash and not existing.url_hash:
+                        existing.url_hash = url_hash
+                    pass
+
+
+            if url_hash and db.query(Job).filter_by(url_hash=url_hash).first():
                 continue
 
             # hash dedupe
-            h = text_hash(it.get("title"), it.get("company"), it.get("description_text"))
-            if db.query(Job).filter_by(desc_hash=h).first():
+            desc_bin = sha256_bytes(normalize_text(it.get("description_text", "")))
+            # temporary: keep old TEXT hash populated until cutover (optional)
+            desc_text_legacy = normalize_text(it.get("description_text", ""))  # if you want to keep a text fingerprint
+            #if db.query(Job).filter_by(desc_hash=desc_bin).first():  # once cutover done, this will use binary column name
+            if db.query(Job).filter_by(desc_hash_bin=desc_bin).first():
+                continue
+
+            if existing:
+                if not existing.desc_hash_bin:
+                    existing.desc_hash_bin = desc_bin
+                # keep legacy text fingerprint if you want
+                if not existing.desc_hash:
+                    existing.desc_hash = normalize_text(it.get("description_text", ""))
                 continue
 
             job = Job(
@@ -227,12 +258,35 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 city=it.get("city"),
                 posted_at=it.get("posted_at"),
                 source=it.get("source", "crawl"),
-                url=it.get("url"),
+                url=canon_url or it.get("url"),
+                url_hash=url_hash,
                 description_text=it.get("description_text", ""),
-                desc_hash=h,
+                desc_hash_bin=desc_bin,  # <-- NEW column for now
+                desc_hash=desc_text_legacy,  # <-- existing TEXT column (temporary)
+
             )
             db.add(job)
-            db.flush()
+            #db.flush()
+
+            try:
+                db.flush()
+            except IntegrityError:
+                # Race or leftover duplicates on url — recover by updating existing row
+                db.rollback()
+                ex = db.query(Job).filter(
+                    Job.url == (canon_url or it.get("url"))
+                ).first()
+                if ex:
+                    if url_hash and not ex.url_hash:
+                        ex.url_hash = url_hash
+                    if not ex.desc_hash_bin:
+                        ex.desc_hash_bin = desc_bin
+                    if not ex.desc_hash:
+                        ex.desc_hash = normalize_text(it.get("description_text", ""))
+                    db.flush()
+                    continue
+                else:
+                    raise
 
             for name, conf in extract(job.description_text or ""):
                 skill = db.query(Skill).filter_by(name_canonical=name).first()
