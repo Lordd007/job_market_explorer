@@ -238,10 +238,9 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
 
             # hash dedupe
             desc_bin = sha256_bytes(normalize_text(it.get("description_text", "")))
-            # temporary: keep old TEXT hash populated until cutover (optional)
-            desc_text_legacy = normalize_text(it.get("description_text", ""))  # if you want to keep a text fingerprint
-            #if db.query(Job).filter_by(desc_hash=desc_bin).first():  # once cutover done, this will use binary column name
-            if db.query(Job).filter_by(desc_hash_bin=desc_bin).first():
+
+
+            if db.query(Job).filter_by(desc_hash=desc_bin).first():
                 continue
 
             if existing:
@@ -261,10 +260,8 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 url=canon_url or it.get("url"),
                 url_hash=url_hash,
                 description_text=it.get("description_text", ""),
-                desc_hash_bin=desc_bin,  # <-- NEW column for now
-                desc_hash=desc_text_legacy,  # <-- existing TEXT column (temporary)
-
-            )
+                desc_hash=desc_bin,  # <-- NEW column for now
+                )
             db.add(job)
             #db.flush()
 

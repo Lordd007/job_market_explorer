@@ -37,19 +37,16 @@ class Job(Base):
     url: Mapped[str | None] = mapped_column(String, unique=True)
 
     description_text: Mapped[str] = mapped_column(Text, default="", server_default="")
-    # Legacy TEXT hash (keep until cutover)
-    desc_hash: Mapped[str] = mapped_column(Text, default="", server_default="")
 
-    # NEW transitional columns
     url_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    desc_hash_bin: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    desc_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow, server_default="now()")
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow, server_default="now()")
 
     __table_args__ = (
         UniqueConstraint("url_hash", name="jobs_url_hash_uq"),
-        Index("jobs_desc_hash_bin_idx", "desc_hash_bin"),
+        Index("jobs_desc_hash_idx", "desc_hash"),
     )
 
 
