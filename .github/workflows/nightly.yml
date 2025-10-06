@@ -15,7 +15,7 @@ jobs:
           python-version: "3.11"
       - run: pip install -r requirements.txt || true
       - run: python -m spacy download en_core_web_sm
-      - run: python -m ingest.nightly
+      - run: python -m scripts.nightly_ingest
         env:
           REQUEST_DELAY: "0.25"
           SOURCES_JSON: "data/sources.json"
