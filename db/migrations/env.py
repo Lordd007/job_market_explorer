@@ -17,8 +17,9 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def _with_sslmode_require(url: str) -> str:
-    """Append sslmode=require if it's not already present."""
     u = urlparse(url)
+    if not u.scheme.startswith("postgresql"):
+        return url
     q = dict(parse_qsl(u.query))
     if "sslmode" not in q:
         q["sslmode"] = "require"
