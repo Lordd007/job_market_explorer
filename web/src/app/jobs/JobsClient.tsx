@@ -176,4 +176,84 @@ export default function JobsClient() {
           <label className="text-sm opacity-70">Sort</label>
           <select
             value={sort}
-            onChange={e => setSort(e.ta
+            onChange={e => setSort(e.target.value as SortMode)}
+            className="bg-transparent border rounded px-3 py-2"
+          >
+            <option value="newest">Newest</option>
+            <option value="title">Title (A→Z)</option>
+            <option value="company">Company (A→Z)</option>
+          </select>
+        </div>
+      </div>
+
+      {error && <div className="text-red-400">Error: {error}</div>}
+
+      {loading && (
+        <ul className="divide-y divide-neutral-800 rounded border animate-pulse">
+          {Array.from({length:6}).map((_,i)=>(
+            <li key={i} className="p-4">
+              <div className="h-4 w-48 bg-neutral-800 rounded mb-2" />
+              <div className="h-3 w-32 bg-neutral-900 rounded" />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!loading && resp && resp.total === 0 && (
+        <div className="opacity-70">
+          No jobs found. Try clearing filters or increasing the day window.
+        </div>
+      )}
+
+      {!loading && resp && resp.total > 0 && (
+        <>
+          <div className="text-sm opacity-70">
+            Showing {(resp.page-1)*resp.page_size + 1}–
+            {Math.min(resp.page*resp.page_size, resp.total)} of {resp.total}
+          </div>
+
+          <ul className="divide-y divide-neutral-800 rounded border">
+            {items.map((j) => (
+              <li key={j.job_id} className="p-4 hover:bg-neutral-900">
+                <div className="flex justify-between gap-4 flex-wrap">
+                  <div>
+                    <div className="font-semibold">{j.title}</div>
+                    <div className="opacity-80">{j.company}</div>
+                    <div className="opacity-60 text-sm">
+                      {j.city || "N/A"} · {new Date(j.posted_at || j.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {j.url && (
+                    <a className="border rounded px-3 py-2" href={j.url} target="_blank" rel="noreferrer">
+                      View Posting
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex gap-2 items-center pt-4">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p-1))}
+              className="border rounded px-3 py-2 disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <div className="text-sm opacity-80">
+              Page {page} / {totalPages}
+            </div>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p+1))}
+              className="border rounded px-3 py-2 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
