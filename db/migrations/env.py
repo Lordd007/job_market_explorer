@@ -3,31 +3,30 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-
+from sqlalchemy import create_engine, pool
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 from db.base import Base
-from db import models
-from core.config import get_settings  # <-- NEW
+from db import models  # noqa: F401
+from core.config import get_settings
 
-# Alembic Config object
 config = context.config
-
-# Logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Inject the normalized DATABASE_URL from app settings
-settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-
-# Target metadata
 target_metadata = Base.metadata
 
+def _with_sslmode_require(url: str) -> str:
+    """Append sslmode=require if it's not already present."""
+    u = urlparse(url)
+    q = dict(parse_qsl(u.query))
+    if "sslmode" not in q:
+        q["sslmode"] = "require"
+    return urlunparse(u._replace(query=urlencode(q)))
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
+    settings = get_settings()
+    url = _with_sslmode_require(settings.DATABASE_URL)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -37,19 +36,15 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
-
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
+    settings = get_settings()
+    url = _with_sslmode_require(settings.DATABASE_URL)
+    engine = create_engine(url, poolclass=pool.NullPool, future=True)
+
+    with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
-
 
 if context.is_offline_mode():
     run_migrations_offline()
