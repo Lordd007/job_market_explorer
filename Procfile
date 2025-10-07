@@ -1,2 +1,1 @@
-web: gunicorn api.main:app -k uvicorn.workers.UvicornWorker --preload --timeout 60
-release: alembic upgrade head
+web: uvicorn api.main:app --host 0.0.0.0 --port $PORT
