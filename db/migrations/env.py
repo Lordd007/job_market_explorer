@@ -1,11 +1,14 @@
 # db/migrations/env.py
+from __future__ import annotations
+
 from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-# --- our app imports: make sure these work ---
+
 from db.base import Base
-from db import models  # noqa: F401  (import to register models on Base)
+from db import models
+from core.config import get_settings  # <-- NEW
 
 # Alembic Config object
 config = context.config
@@ -14,13 +17,17 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Give Alembic your metadata
+# Inject the normalized DATABASE_URL from app settings
+settings = get_settings()
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+# Target metadata
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")  # from alembic.ini
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
