@@ -17,6 +17,7 @@ from ingest.skills_extract import build_matcher, extract
 
 from ingest.dedupe import canonicalize_url, normalize_text, sha256_bytes
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert
 
 HEADERS = {"User-Agent": "JobMarketExplorer/0.1 (academic/portfolio use)"}
 CONCURRENCY = 8
@@ -244,11 +245,8 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 continue
 
             if existing:
-                if not existing.desc_hash_bin:
-                    existing.desc_hash_bin = desc_bin
-                # keep legacy text fingerprint if you want
                 if not existing.desc_hash:
-                    existing.desc_hash = normalize_text(it.get("description_text", ""))
+                    existing.desc_hash = desc_bin
                 continue
 
             job = Job(
@@ -257,7 +255,7 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 city=it.get("city"),
                 posted_at=it.get("posted_at"),
                 source=it.get("source", "crawl"),
-                url=canon_url or it.get("url"),
+                url=it.get("url"),
                 url_hash=url_hash,
                 description_text=it.get("description_text", ""),
                 desc_hash=desc_bin,  # <-- NEW column for now
@@ -271,15 +269,13 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 # Race or leftover duplicates on url — recover by updating existing row
                 db.rollback()
                 ex = db.query(Job).filter(
-                    Job.url == (canon_url or it.get("url"))
+                    Job.url == it.get("url")
                 ).first()
                 if ex:
                     if url_hash and not ex.url_hash:
                         ex.url_hash = url_hash
-                    if not ex.desc_hash_bin:
-                        ex.desc_hash_bin = desc_bin
                     if not ex.desc_hash:
-                        ex.desc_hash = normalize_text(it.get("description_text", ""))
+                        ex.desc_hash = desc_bin
                     db.flush()
                     continue
                 else:
@@ -288,10 +284,21 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
             for name, conf in extract(job.description_text or ""):
                 skill = db.query(Skill).filter_by(name_canonical=name).first()
                 if not skill:
-                    skill = Skill(name_canonical=name)
-                    db.add(skill)
-                    db.flush()
-                db.add(JobSkill(job_id=str(job.job_id), skill_id=skill.skill_id, confidence=conf, source="dict_v1"))
+                    # dictionary not seeded / mismatch — skip or log
+                    # logger.warning(f"Unknown skill {name} on job {job.job_id}")
+                    continue
+
+
+                stmt = insert(JobSkill).values(
+                    job_id=job.job_id,
+                    skill_id=skill.skill_id,
+                    confidence=conf,
+                    source="dict_v1",
+                ).on_conflict_do_update(
+                    index_elements=[JobSkill.job_id, JobSkill.skill_id],
+                    set_={"confidence": conf, "source": "dict_v1"}
+                )
+                db.execute(stmt)
 
             added += 1
 
