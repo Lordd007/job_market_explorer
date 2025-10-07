@@ -1,21 +1,14 @@
-"""init schema
-
-Revision ID: f85777ef854a
-Revises: 211203defb0c
-Create Date: 2025-10-07 01:27:03.156712
-
-"""
-from typing import Sequence, Union
+"""init schema (create core tables)"""
 
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'f85777ef854a'
-down_revision: Union[str, Sequence[str], None] = '211203defb0c'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision = "0001_init_schema"
+down_revision = None
+branch_labels = None
+depends_on = None
 
 
 def upgrade():
