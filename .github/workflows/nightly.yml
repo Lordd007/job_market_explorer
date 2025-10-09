@@ -2,22 +2,68 @@ name: Nightly Ingest
 
 on:
   schedule:
-    - cron: "15 3 * * *"   # 03:15 UTC daily
+    - cron: "15 3 * * *"  # 03:15 UTC daily
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   run:
     runs-on: ubuntu-latest
+    env:
+      REQUEST_DELAY: "0.25"
+      SOURCES_JSON: "data/sources.json"
+      HEROKU_APP: ${{ secrets.HEROKU_APP_API_STAGING }}
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Heroku CLI
+        run: |
+          curl https://cli-assets.heroku.com/install.sh | sh
+
+      - name: Fetch DATABASE_URL from Heroku
+        id: dburl
+        run: |
+          # pulls the *current* rotated URL from app config
+          DBURL=$(heroku config:get DATABASE_URL -a "$HEROKU_APP")
+          if [ -z "$DBURL" ]; then
+            echo "No DATABASE_URL returned"; exit 1
+          fi
+          echo "DATABASE_URL=$DBURL" >> $GITHUB_ENV
+
       - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - uses: actions/cache@v4
         with:
-          python-version: "3.11"
-      - run: pip install -r requirements.txt || true
-      - run: python -m spacy download en_core_web_sm
-      - run: python -m scripts.nightly_ingest
-        env:
-          REQUEST_DELAY: "0.25"
-          SOURCES_JSON: "data/sources.json"
-          # Add secrets here if your pipeline writes to a remote DB:
-          # DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip wheel
+          pip install -r requirements.txt
+
+      # Update en_core_web_sm in requirmements.txt
+#      - name: Install spaCy model
+#        run: python -m spacy download en_core_web_sm
+
+      # ---- DB prep (idempotent) ----
+      - name: Alembic upgrade
+        run: alembic upgrade head
+
+      - name: Seed skills
+        run: python -m scripts.seed_skills
+
+      # ---- Ingest + rollups ----
+      - name: Nightly ingest
+        run: python -m scripts.nightly_ingest
+
+      - name: Build weekly rollups
+        run: python -m scripts.build_skill_weekly
+
+      - name: DB sanity checks
+        run: python -m scripts.dbcheck

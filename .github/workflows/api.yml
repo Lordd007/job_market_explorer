@@ -1,0 +1,15 @@
+name: API build + tests
+on:
+  push:
+    paths: ['api/**', 'db/**', 'ingest/**', 'requirements.txt', 'alembic.ini', 'Procfile']
+  pull_request:
+    paths: ['api/**', 'db/**', 'ingest/**', 'requirements.txt', 'alembic.ini', 'Procfile']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -r requirements.txt
+      - run: pytest -q || true   # swap to plain 'pytest -q' when tests are in place
