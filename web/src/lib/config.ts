@@ -1,5 +1,5 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ??
   (process.env.NODE_ENV === "production"
-    ? "https://jme-api-staging.herokuapp.com"
+    ? "https://jme-api-staging-13ca850a482b.herokuapp.com"
     : "http://127.0.0.1:8000");
