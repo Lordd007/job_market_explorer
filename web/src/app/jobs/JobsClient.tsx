@@ -2,22 +2,73 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { fetchJSON } from "@/lib/api";         // <- remove apiUrl (unused)
+import { fetchJSON } from "@/lib/api";
 import { ALL_CITIES } from "@/data/cities";
 
+/* ---------- helpers for consistent location/mode rendering ---------- */
+
+function deriveMode(city: string | null | undefined, remoteFlag?: boolean): "" | "Remote" | "Hybrid" | "In-Office" {
+  if (remoteFlag) return "Remote";
+  const s = (city || "").toLowerCase();
+  if (/\bhybrid\b/.test(s)) return "Hybrid";
+  if (/\b(in[- ]?office|office|onsite|on[- ]?site)\b/.test(s)) return "In-Office";
+  return "";
+}
+
+function cleanCity(
+  city: string | null | undefined,
+  region?: string | null,
+  country?: string | null,
+  remoteFlag?: boolean
+): string {
+  // If no vendor string, fall back smartly
+  if (!city || !city.trim()) {
+    if (remoteFlag) return country ? `Remote - ${country}` : "Remote";
+    const parts = [region, country].filter(Boolean);
+    return parts.length ? parts.join(", ") : "N/A";
+  }
+
+  // Strip common vendor noise from the vendor-provided location string
+  let c = city
+    .replace(/^\s*home\s*based\s*-\s*/i, "") // "Home based - EMEA" -> "EMEA"
+    .replace(/\s*\boffice\b.*$/i, "")        // "Emeryville, CA Office" -> "Emeryville, CA"
+    .replace(/\s*remote\s*-\s*.*$/i, "")     // "Remote - US" -> ""
+    .replace(/\s*\bhybrid\b.*$/i, "")        // "Atlanta, GA Hybrid" -> "Atlanta, GA"
+    .trim();
+
+  if (!c && remoteFlag) return country ? `Remote - ${country}` : "Remote";
+  if (!c) {
+    const parts = [region, country].filter(Boolean);
+    return parts.length ? parts.join(", ") : "N/A";
+  }
+  return c;
+}
+
+/* -------------------------- types -------------------------- */
+
 type Job = {
-  job_id: string; title: string; company: string;
-  city: string | null; region: string | null; country: string | null;
-  posted_at: string | null; created_at: string; url: string | null;
+  job_id: string;
+  title: string;
+  company: string;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  posted_at: string | null;
+  created_at: string;
+  url: string | null;
+  remote_flag?: boolean;        // <-- include if API returns it (it should)
 };
+
 type JobsResp = { total: number; page: number; page_size: number; items: Job[] };
 type SortMode = "newest" | "title" | "company";
+
+/* ------------------------ component ------------------------ */
 
 export default function JobsClient() {
   const router = useRouter();
   const params = useSearchParams();
 
-  // ── filters / state ───────────────────────────────────────────────────────────
+  // filters / state
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [skill, setSkill] = useState("");
@@ -31,7 +82,7 @@ export default function JobsClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── hydrate filters from URL on first mount ───────────────────────────────────
+  // hydrate filters from URL on first mount
   useEffect(() => {
     const q0 = params.get("q") ?? "";
     const city0 = params.get("city") ?? "";
@@ -47,7 +98,7 @@ export default function JobsClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── persist filters to URL (shallow) ─────────────────────────────────────────
+  // persist filters to URL (shallow)
   useEffect(() => {
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
@@ -59,13 +110,13 @@ export default function JobsClient() {
     router.replace(`/jobs?${sp.toString()}`, { scroll: false });
   }, [q, city, skill, days, page, sort, router]);
 
-  // ── debounce search input → q ────────────────────────────────────────────────
+  // debounce search input → q
   useEffect(() => {
     const t = setTimeout(() => { setQ(qInput); setPage(1); }, 250);
     return () => clearTimeout(t);
   }, [qInput]);
 
-  // ── fetch jobs ───────────────────────────────────────────────────────────────
+  // fetch jobs
   useEffect(() => {
     const ac = new AbortController();
     setLoading(true);
@@ -79,7 +130,7 @@ export default function JobsClient() {
     return () => ac.abort();
   }, [q, city, skill, days, page]);
 
-  // ── skill typeahead ──────────────────────────────────────────────────────────
+  // skill typeahead
   useEffect(() => {
     if (!skill || skill.length < 2) { setSuggest([]); return; }
     const t = setTimeout(() => {
@@ -90,7 +141,7 @@ export default function JobsClient() {
     return () => clearTimeout(t);
   }, [skill]);
 
-  // ── derived: client-side sort & pagination label ─────────────────────────────
+  // derived: client-side sort & pagination label
   const totalPages = useMemo(
     () => (resp ? Math.max(1, Math.ceil(resp.total / (resp.page_size || 20))) : 1),
     [resp]
@@ -98,13 +149,20 @@ export default function JobsClient() {
 
   const items = useMemo(() => {
     if (!resp) return [];
-    const out = [...resp.items];
-    if (sort === "title") out.sort((a,b)=>a.title.localeCompare(b.title));
-    else if (sort === "company") out.sort((a,b)=>a.company.localeCompare(b.company));
-    return out; // newest = API order
-  }, [resp, sort]);
+    let out = [...resp.items];
 
-  // ── UI ───────────────────────────────────────────────────────────────────────
+    // optional: when a city is selected, hide pure-remote rows
+    if (city) {
+      out = out.filter(j => !j.remote_flag);
+    }
+
+    if (sort === "title") out.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sort === "company") out.sort((a, b) => a.company.localeCompare(b.company));
+    // newest = API order
+    return out;
+  }, [resp, sort, city]);
+
+  // UI
   return (
     <div className="p-8 space-y-6">
       <h1 className="text-2xl font-bold">Browse Jobs</h1>
@@ -190,7 +248,7 @@ export default function JobsClient() {
 
       {loading && (
         <ul className="divide-y divide-neutral-800 rounded border animate-pulse">
-          {Array.from({length:6}).map((_,i)=>(
+          {Array.from({ length: 6 }).map((_, i) => (
             <li key={i} className="p-4">
               <div className="h-4 w-48 bg-neutral-800 rounded mb-2" />
               <div className="h-3 w-32 bg-neutral-900 rounded" />
@@ -208,35 +266,42 @@ export default function JobsClient() {
       {!loading && resp && resp.total > 0 && (
         <>
           <div className="text-sm opacity-70">
-            Showing {(resp.page-1)*resp.page_size + 1}–
-            {Math.min(resp.page*resp.page_size, resp.total)} of {resp.total}
+            Showing {(resp.page - 1) * resp.page_size + 1}–
+            {Math.min(resp.page * resp.page_size, resp.total)} of {resp.total}
           </div>
 
           <ul className="divide-y divide-neutral-800 rounded border">
-            {items.map((j) => (
-              <li key={j.job_id} className="p-4 hover:bg-neutral-900">
-                <div className="flex justify-between gap-4 flex-wrap">
-                  <div>
-                    <div className="font-semibold">{j.title}</div>
-                    <div className="opacity-80">{j.company}</div>
-                    <div className="opacity-60 text-sm">
-                      {j.city || "N/A"} · {new Date(j.posted_at || j.created_at).toLocaleDateString()}
+            {items.map((j) => {
+              const mode = deriveMode(j.city, j.remote_flag);
+              const place = cleanCity(j.city, j.region, j.country, j.remote_flag);
+              const when = new Date(j.posted_at || j.created_at).toLocaleDateString();
+
+              return (
+                <li key={j.job_id} className="p-4 hover:bg-neutral-900">
+                  <div className="flex justify-between gap-4 flex-wrap">
+                    <div>
+                      <div className="font-semibold">{j.title}</div>
+                      <div className="opacity-80">{j.company}</div>
+                      <div className="opacity-80">{place}</div>
+                      <div className="opacity-60 text-sm">
+                        {mode ? `${mode} · ` : ""}{when}
+                      </div>
                     </div>
+                    {j.url && (
+                      <a className="border rounded px-3 py-2" href={j.url} target="_blank" rel="noreferrer">
+                        View Posting
+                      </a>
+                    )}
                   </div>
-                  {j.url && (
-                    <a className="border rounded px-3 py-2" href={j.url} target="_blank" rel="noreferrer">
-                      View Posting
-                    </a>
-                  )}
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
 
           <div className="flex gap-2 items-center pt-4">
             <button
               disabled={page <= 1}
-              onClick={() => setPage(p => Math.max(1, p-1))}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               className="border rounded px-3 py-2 disabled:opacity-50"
             >
               Prev
@@ -246,7 +311,7 @@ export default function JobsClient() {
             </div>
             <button
               disabled={page >= totalPages}
-              onClick={() => setPage(p => Math.min(totalPages, p+1))}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               className="border rounded px-3 py-2 disabled:opacity-50"
             >
               Next
