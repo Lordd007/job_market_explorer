@@ -29,7 +29,7 @@ function cleanCity(
   }
 
   // Strip common vendor noise from the vendor-provided location string
-  let c = city
+  const c = city
     .replace(/^\s*home\s*based\s*-\s*/i, "") // "Home based - EMEA" -> "EMEA"
     .replace(/\s*\boffice\b.*$/i, "")        // "Emeryville, CA Office" -> "Emeryville, CA"
     .replace(/\s*remote\s*-\s*.*$/i, "")     // "Remote - US" -> ""
