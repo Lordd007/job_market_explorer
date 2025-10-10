@@ -113,7 +113,7 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     db.execute(sql("DELETE FROM resume_experience WHERE resume_id=:rid"), {"rid": res.resume_id})
     for e in parsed.get("experience", []):
         db.execute(sql("""
-            INSERT INTO resume_experience(resume_id, title, company, location, start, end, bullets_json)
+            INSERT INTO resume_experience(resume_id, title, company, location, start_text, end_text, bullets_json)
             VALUES (:rid, :title, :company, :loc, :start, :end, :bul)
         """), {
             "rid": res.resume_id,

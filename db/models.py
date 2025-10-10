@@ -136,8 +136,8 @@ class ResumeExperience(Base):
     title: Mapped[str | None] = mapped_column(Text)
     company: Mapped[str | None] = mapped_column(Text)
     location: Mapped[str | None] = mapped_column(Text)
-    start: Mapped[str | None] = mapped_column(Text)
-    end: Mapped[str | None] = mapped_column(Text)
+    start_text: Mapped[str | None] = mapped_column(Text)
+    end_text: Mapped[str | None] = mapped_column(Text)
     bullets_json: Mapped[str] = mapped_column(Text, default="[]")
 
 class ResumeEducation(Base):
