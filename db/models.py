@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import ARRAY
 from db.base import Base
-
+from pgvector.sqlalchemy import Vector
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -89,6 +89,8 @@ class Resume(Base):
     file_size: Mapped[int | None] = mapped_column(Integer)
     text_content: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(384))
+    parsed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
 class ResumeSkill(Base):
     __tablename__ = "resume_skills"
@@ -105,3 +107,43 @@ class UserPreferences(Base):
     companies: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
     seniority: Mapped[str] = mapped_column(Text, default="any")
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+
+
+
+class ResumeParsed(Base):
+    __tablename__ = "resume_parsed"
+    resume_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("resumes.resume_id", ondelete="CASCADE"), primary_key=True)
+    full_name: Mapped[str | None] = mapped_column(Text)
+    email: Mapped[str | None] = mapped_column(Text)
+    phone: Mapped[str | None] = mapped_column(Text)
+    city: Mapped[str | None] = mapped_column(Text)
+    region: Mapped[str | None] = mapped_column(Text)
+    country: Mapped[str | None] = mapped_column(Text)
+    postal_code: Mapped[str | None] = mapped_column(Text)
+    summary: Mapped[str | None] = mapped_column(Text)
+    years_experience: Mapped[float | None]
+
+class ResumeLink(Base):
+    __tablename__ = "resume_links"
+    resume_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("resumes.resume_id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    url: Mapped[str]  = mapped_column(Text, primary_key=True)
+
+class ResumeExperience(Base):
+    __tablename__ = "resume_experience"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    resume_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("resumes.resume_id", ondelete="CASCADE"))
+    title: Mapped[str | None] = mapped_column(Text)
+    company: Mapped[str | None] = mapped_column(Text)
+    location: Mapped[str | None] = mapped_column(Text)
+    start: Mapped[str | None] = mapped_column(Text)
+    end: Mapped[str | None] = mapped_column(Text)
+    bullets_json: Mapped[str] = mapped_column(Text, default="[]")
+
+class ResumeEducation(Base):
+    __tablename__ = "resume_education"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    resume_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("resumes.resume_id", ondelete="CASCADE"))
+    degree: Mapped[str | None] = mapped_column(Text)
+    school: Mapped[str | None] = mapped_column(Text)
+    year: Mapped[str | None] = mapped_column(Text)
