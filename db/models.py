@@ -9,6 +9,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import ARRAY
 from db.base import Base
 
 
@@ -71,3 +72,36 @@ class JobSkill(Base):
     )
     confidence: Mapped[float] = mapped_column(Float, default=0.9)
     source: Mapped[str] = mapped_column(Text, default="dict_v1")
+
+
+class User(Base):
+    __tablename__ = "users"
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    auth_sub: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+
+class Resume(Base):
+    __tablename__ = "resumes"
+    resume_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"))
+    file_mime: Mapped[str | None] = mapped_column(Text)
+    file_size: Mapped[int | None] = mapped_column(Integer)
+    text_content: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+
+class ResumeSkill(Base):
+    __tablename__ = "resume_skills"
+    resume_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("resumes.resume_id", ondelete="CASCADE"), primary_key=True)
+    skill: Mapped[str] = mapped_column(Text, primary_key=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.9)
+
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    cities: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    remote_mode: Mapped[str] = mapped_column(Text, default="any")      # remote|hybrid|office|any
+    target_skills: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    companies: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
+    seniority: Mapped[str] = mapped_column(Text, default="any")
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
