@@ -33,6 +33,15 @@ def get_current_user_id() -> uuid.UUID:
 @router.post("/resumes")
 async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
     user_id = get_current_user_id()
+
+    #Check to see if user exists in db
+    db.execute(sql("""
+            INSERT INTO users (user_id, auth_sub, email)
+            VALUES (:id, 'demo-user', 'demo@example.com')
+            ON CONFLICT (user_id) DO NOTHING
+        """), {"id": str(user_id)})
+
+
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(413, "File too large (limit 5MB for demo)")
