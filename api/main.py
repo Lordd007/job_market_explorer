@@ -4,6 +4,7 @@ from api.routers import jobs, skills
 from api import errors
 from api.routers import resumes
 from api.routers import preferences
+from api.routers import recommendations
 import os, json
 
 app = FastAPI(title="Job Market Explorer")
@@ -52,4 +53,5 @@ app.include_router(jobs.router, prefix="/api")
 app.include_router(skills.router, prefix="/api")
 app.include_router(resumes.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
+app.include_router(recommendations.router, prefix="/api")
 errors.install(app)
