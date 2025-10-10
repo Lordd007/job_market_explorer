@@ -19,71 +19,94 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade():
-    # ensure pgvector exists; resumes.embedding may already exist
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
-    # resumes: add embedding (384) & parsed timestamp if not present
-    with op.batch_alter_table("resumes") as b:
-        b.add_column(sa.Column("embedding", Vector(dim=384), nullable=True))
-        b.add_column(sa.Column("parsed_at", sa.DateTime(timezone=True), nullable=True))
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    cols = {c['name'] for c in insp.get_columns('resumes')}
+    tables = set(insp.get_table_names(schema='public'))
 
-    # parsed one-to-one
-    op.create_table(
-        "resume_parsed",
-        sa.Column("resume_id", sa.UUID(as_uuid=True), primary_key=True),
-        sa.Column("full_name", sa.Text(), nullable=True),
-        sa.Column("email", sa.Text(), nullable=True),
-        sa.Column("phone", sa.Text(), nullable=True),
-        sa.Column("city", sa.Text(), nullable=True),
-        sa.Column("region", sa.Text(), nullable=True),   # state/province
-        sa.Column("country", sa.Text(), nullable=True),
-        sa.Column("postal_code", sa.Text(), nullable=True),
-        sa.Column("summary", sa.Text(), nullable=True),
-        sa.Column("years_experience", sa.Float(), nullable=True),
-        sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
-    )
+    # --- resumes: parsed_at + embedding (384) ---
+    if "parsed_at" not in cols:
+        op.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS parsed_at timestamptz")
 
-    # links (linkedin, portfolio, github, etc.)
-    op.create_table(
-        "resume_links",
-        sa.Column("resume_id", sa.UUID(as_uuid=True), nullable=False),
-        sa.Column("kind", sa.Text(), nullable=False),    # linkedin|portfolio|github|other
-        sa.Column("url", sa.Text(), nullable=False),
-        sa.PrimaryKeyConstraint("resume_id", "kind", "url"),
-        sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
-    )
+    if "embedding" not in cols:
+        # add fresh at 384-dim
+        op.execute("ALTER TABLE resumes ADD COLUMN IF NOT EXISTS embedding vector(384)")
+    else:
+        # try to coerce to 384 if it exists with a different dim; swallow errors safely
+        op.execute("""
+        DO $$
+        BEGIN
+            BEGIN
+                ALTER TABLE resumes ALTER COLUMN embedding TYPE vector(384);
+            EXCEPTION WHEN others THEN
+                -- leave as-is if incompatible; you can adjust manually later
+                NULL;
+            END;
+        END $$;
+        """)
 
-    # experience
-    op.create_table(
-        "resume_experience",
-        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
-        sa.Column("resume_id", sa.UUID(as_uuid=True), nullable=False),
-        sa.Column("title", sa.Text(), nullable=True),
-        sa.Column("company", sa.Text(), nullable=True),
-        sa.Column("location", sa.Text(), nullable=True),
-        sa.Column("start", sa.Text(), nullable=True),    # keep as text first; parse later (YYYY-MM)
-        sa.Column("end", sa.Text(), nullable=True),      # "Present" allowed
-        sa.Column("bullets_json", sa.Text(), server_default="[]"),
-        sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
-    )
-    op.create_index("resume_exp_resume_idx", "resume_experience", ["resume_id"])
+    # --- resume_parsed ---
+    if "resume_parsed" not in tables:
+        op.create_table(
+            "resume_parsed",
+            sa.Column("resume_id", sa.UUID(as_uuid=True), primary_key=True),
+            sa.Column("full_name", sa.Text()),
+            sa.Column("email", sa.Text()),
+            sa.Column("phone", sa.Text()),
+            sa.Column("city", sa.Text()),
+            sa.Column("region", sa.Text()),
+            sa.Column("country", sa.Text()),
+            sa.Column("postal_code", sa.Text()),
+            sa.Column("summary", sa.Text()),
+            sa.Column("years_experience", sa.Float()),
+            sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
+        )
 
-    # education
-    op.create_table(
-        "resume_education",
-        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
-        sa.Column("resume_id", sa.UUID(as_uuid=True), nullable=False),
-        sa.Column("degree", sa.Text(), nullable=True),
-        sa.Column("school", sa.Text(), nullable=True),
-        sa.Column("year", sa.Text(), nullable=True),
-        sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
-    )
-    op.create_index("resume_edu_resume_idx", "resume_education", ["resume_id"])
+    # --- resume_links ---
+    if "resume_links" not in tables:
+        op.create_table(
+            "resume_links",
+            sa.Column("resume_id", sa.UUID(as_uuid=True), nullable=False),
+            sa.Column("kind", sa.Text(), nullable=False),
+            sa.Column("url", sa.Text(), nullable=False),
+            sa.PrimaryKeyConstraint("resume_id", "kind", "url"),
+            sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
+        )
+
+    # --- resume_experience ---
+    if "resume_experience" not in tables:
+        op.create_table(
+            "resume_experience",
+            sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
+            sa.Column("resume_id", sa.UUID(as_uuid=True), nullable=False),
+            sa.Column("title", sa.Text()),
+            sa.Column("company", sa.Text()),
+            sa.Column("location", sa.Text()),
+            sa.Column("start", sa.Text()),
+            sa.Column("end", sa.Text()),
+            sa.Column("bullets_json", sa.Text(), server_default="[]"),
+            sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
+        )
+        op.execute("CREATE INDEX IF NOT EXISTS resume_exp_resume_idx ON resume_experience (resume_id)")
+
+    # --- resume_education ---
+    if "resume_education" not in tables:
+        op.create_table(
+            "resume_education",
+            sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
+            sa.Column("resume_id", sa.UUID(as_uuid=True), nullable=False),
+            sa.Column("degree", sa.Text()),
+            sa.Column("school", sa.Text()),
+            sa.Column("year", sa.Text()),
+            sa.ForeignKeyConstraint(["resume_id"], ["resumes.resume_id"], ondelete="CASCADE"),
+        )
+        op.execute("CREATE INDEX IF NOT EXISTS resume_edu_resume_idx ON resume_education (resume_id)")
 
 def downgrade():
-    op.drop_index("resume_edu_resume_idx", table_name="resume_education")
-    op.drop_table("resume_education")
-    op.drop_index("resume_exp_resume_idx", table_name="resume_experience")
-    op.drop_table("resume_experience")
-    op.drop_table("resume_links")
-    op.drop_table("resume_parsed")
+    # minimal downgrade (optional)
+    op.execute("DROP TABLE IF EXISTS resume_education CASCADE")
+    op.execute("DROP TABLE IF EXISTS resume_experience CASCADE")
+    op.execute("DROP TABLE IF EXISTS resume_links CASCADE")
+    op.execute("DROP TABLE IF EXISTS resume_parsed CASCADE")
