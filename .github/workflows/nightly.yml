@@ -62,6 +62,10 @@ jobs:
       - name: Nightly ingest
         run: python -m scripts.nightly_ingest
 
+      - name: Backfill job embeddings (small batch)
+        run: python -m scripts.backfill_job_embeddings
+
+
       - name: Build weekly rollups
         run: python -m scripts.build_skill_weekly
 
