@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
 from db.models import Resume, ResumeSkill, User
-import uuid, magic  # file type (python-magic), or fallback to mimetypes
+import uuid, mimetypes  # use content_type or filename-based guess
 from ingest.skills_extract import build_matcher, extract as extract_skills
 from utils.resume_extract import extract_text_from_file
 
@@ -24,11 +24,8 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(413, "File too large (limit 5MB for demo)")
 
-    # detect mime
-    try:
-        mime = magic.from_buffer(content, mime=True)
-    except Exception:
-        mime = file.content_type or "application/octet-stream"
+    # detect mime - prefer UploadFile.content_type; fallback to filename
+    mime = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
 
     text = extract_text_from_file(file.filename or "resume", mime, content)
     if not text or len(text.strip()) < 30:
