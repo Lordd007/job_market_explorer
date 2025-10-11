@@ -5,6 +5,12 @@ from typing import Any, Dict, List, Optional, Tuple
 EMAIL  = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE  = re.compile(r"(\+?1[\s\-\.]?)?\(?\d{3}\)?[\s\-\.]?\d{3}[\s\-\.]?\d{4}")
 LINK   = re.compile(r"(https?://[^\s)]+)", re.I)
+
+US_STATES = {
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY",
+  "LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND",
+  "OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"
+}
 LOC_US = re.compile(r"([A-Za-z][A-Za-z .'\-]+),\s*([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?")
 YEAR_RANGE = re.compile(r"(\b19|20)\d{2}\s*-\s*(Present|\b(19|20)\d{2})", re.I)
 
@@ -15,38 +21,44 @@ SECTION_NAMES = {
     "skills": ["technical skills", "skills"],
 }
 
+# date patterns
+YEAR_RANGE   = re.compile(r"(\b19|20)\d{2}\s*-\s*(Present|Current|\b(19|20)\d{2})", re.I)
+MONTHS       = r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*"
+MONTH_RANGE  = re.compile(fr"{MONTHS}\.?\s+(\d{{4}})\s*-\s*(Present|Current|{MONTHS}\.?\s+\d{{4}})", re.I)
+
+
 def _first(rx: re.Pattern, s: str) -> Optional[str]:
     m = rx.search(s) if s else None
     return m.group(0) if m else None
 
 def _split_top_header(text: str) -> Dict[str, Any]:
-    # look at the first ~20 lines; PDFs vary
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()][:20]
     out = {"full_name": None, "city": None, "region": None, "country": None,
            "postal_code": None, "email": None, "phone": None, "linkedin": None}
-    if not lines:
-        return out
+    if not lines: return out
 
-    # 1) Name = first non-empty line if it looks like 2–4 capitalized tokens
+    # Name: first non-empty line with 2–4 capitalized tokens
     first = lines[0]
     toks = first.split()
     if 2 <= len(toks) <= 4 and all(t[:1].isupper() for t in toks):
         out["full_name"] = first
 
-    # 2) concatenate header lines
     head = " ".join(lines)
 
-    # Try header first, then whole doc as fallback (PDF extraction can still split tokens)
-    out["email"] = _first(EMAIL, head) or _first(EMAIL, text)
-    out["phone"] = _first(PHONE, head) or _first(PHONE, text)
+    # email/phone/linkedin: header first, fallback to whole doc
+    out["email"] = (EMAIL.search(head) or EMAIL.search(text) or [None])
+    out["email"] = out["email"].group(0) if hasattr(out["email"], "group") else None
+    out["phone"] = (PHONE.search(head) or PHONE.search(text) or [None])
+    out["phone"] = out["phone"].group(0) if hasattr(out["phone"], "group") else None
     urls = LINK.findall(head) or LINK.findall(text)
     out["linkedin"] = next((u for u in urls if "linkedin.com" in u.lower()), None)
 
-    # 3) US location
-    mloc = LOC_US.search(head) or LOC_US.search(text[:4000])
-    if mloc:
+    # location: ONLY accept from the header window, and validate state code
+    mloc = LOC_US.search(head)
+    if mloc and mloc.group(2) in US_STATES:
         out["city"], out["region"], out["postal_code"] = mloc.group(1), mloc.group(2), mloc.group(3)
         out["country"] = "US"
+
     return out
 
 def _find_section(lines: List[str], variants: List[str]) -> int:
@@ -70,24 +82,17 @@ def _clean(s: str) -> str:
     return s.strip("•-—– ").strip()
 
 def _is_company_header(ln: str) -> bool:
-    """A new company line often contains a city/state and a dash."""
     return ("-" in ln or "–" in ln or "—" in ln) and (LOC_US.search(ln) is not None)
 
 def _split_blocks(block_lines: List[str]) -> List[List[str]]:
-    """
-    Split on blank lines and also when we detect a new company header line
-    while a current block already exists.
-    """
     out, cur = [], []
     for ln in block_lines:
         s = ln.strip()
         if not s:
-            if cur:
-                out.append(cur); cur = []
+            if cur: out.append(cur); cur=[]
             continue
         if cur and _is_company_header(s):
-            # start a new block for the next company
-            out.append(cur); cur = [s]
+            out.append(cur); cur=[s]
         else:
             cur.append(s)
     if cur: out.append(cur)
@@ -98,32 +103,40 @@ def _parse_experience(lines: List[str]) -> List[Dict[str, Any]]:
     blocks = _split_blocks(lines)
     for b in blocks:
         if not b: continue
-        head = _clean(b[0])
-        low  = head.lower()
+        head = _clean(b[0]); low = head.lower()
         if low in ("professional experience","experience","work experience","work history"):
             continue
 
         company, location, start, end, role = None, None, None, None, None
 
-        # company/location from first line
         parts = re.split(r"\s+[–—-]\s+|\t+", head)
         if parts: company = parts[0]
         mloc = LOC_US.search(head)
         if mloc:
             location = f"{mloc.group(1)}, {mloc.group(2)}" + (f" {mloc.group(3)}" if mloc.group(3) else "")
-        mdate = YEAR_RANGE.search(head)
-        if mdate:
-            start, end = mdate.group(1), mdate.group(2)
 
-        # look ahead 2–3 lines for role & dates
+        def _pull_dates(s: str):
+            m = YEAR_RANGE.search(s)
+            if m: return m.group(1), m.group(2)
+            m2 = MONTH_RANGE.search(s)
+            if m2:
+                start_y = m2.group(2)
+                end_g = m2.group(3)  # "Present"/"Current" or month
+                if end_g and end_g.lower() in ("present","current"):
+                    return start_y, "Present"
+                # if month on end, also need year; simplified: return the whole match
+                return m2.group(0), None
+            return None
+
+        # look ahead 0–3 lines for role & dates
         idx_after_header = 1
         for k in range(min(3, len(b)-1)):
             ln = _clean(b[1+k])
             if not role and len(ln.split()) <= 10 and "education" not in ln.lower():
                 role = role or ln
-            m2 = YEAR_RANGE.search(ln)
-            if m2:
-                start, end = m2.group(1), m2.group(2)
+            got = _pull_dates(ln)
+            if got:
+                start, end = got
             idx_after_header += 1
 
         bullets = [ _clean(x) for x in b[idx_after_header:] ]

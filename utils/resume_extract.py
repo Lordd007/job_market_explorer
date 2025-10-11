@@ -39,12 +39,22 @@ def extract_text_from_docx(data: bytes) -> str:
 def extract_text_from_file(name: str, mime: str, data: bytes) -> str:
     n = (name or "").lower()
     m = (mime or "").lower()
+
+    # PDF
     if m.startswith("application/pdf") or n.endswith(".pdf"):
         return extract_text_from_pdf(data)
-    if m in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword") \
-        or n.endswith(".docx"):
+
+    # DOCX only
+    if n.endswith(".docx") or m == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         return extract_text_from_docx(data)
-    # plaintext fallback
+
+    # Explicitly reject legacy .doc ( Word 97–2003 )
+    if n.endswith(".doc") or m == "application/msword":
+        # raise here so the endpoint can return a friendly 400:
+        # "Please upload a PDF or DOCX"
+        raise ValueError("Unsupported .doc format; please upload PDF or DOCX")
+
+    # Plaintext fallback
     try:
         return normalize_for_parse(data.decode("utf-8", errors="ignore"))
     except Exception:
