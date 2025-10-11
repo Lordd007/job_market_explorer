@@ -4,23 +4,37 @@ from pypdf import PdfReader
 from docx import Document as DocxDocument
 import io, re
 
-def _clean(text: str) -> str:
-    s = re.sub(r"\r\n?", "\n", text)
+
+WS_BAD = re.compile(r"[\u00A0\u200B\u200C\u200D\uFEFF]")  # NBSP & zero-widths
+DASHES = re.compile(r"[–—]")                              # long dashes
+
+def normalize_for_parse(s: str) -> str:
+    if not s:
+        return ""
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
+    s = WS_BAD.sub(" ", s)
+    s = DASHES.sub("-", s)
     s = re.sub(r"[ \t]+", " ", s)
-    s = re.sub(r"\n{3,}", "\n\n", s)
+    # fix pdf-broken emails/domains
+    s = re.sub(r"\s*@\s*", "@", s)
+    s = re.sub(r"\s*\.\s*(com|edu|net)\b", r".\1", s, flags=re.I)
+    # fix broken phone number digit runs
+    s = re.sub(r"\(\s*(\d{3})\s*\)", r"(\1)", s)
+    s = re.sub(r"(\d)\s+(\d)", r"\1\2", s)
     return s.strip()
+
 
 def extract_text_from_pdf(data: bytes) -> str:
     reader = PdfReader(io.BytesIO(data))
     parts = []
     for page in reader.pages:
         parts.append(page.extract_text() or "")
-    return _clean("\n".join(parts))
+    return normalize_for_parse("\n".join(parts))
 
 def extract_text_from_docx(data: bytes) -> str:
     doc = DocxDocument(io.BytesIO(data))
     texts = [p.text for p in doc.paragraphs]
-    return _clean("\n".join(texts))
+    return normalize_for_parse("\n".join(texts))
 
 def extract_text_from_file(name: str, mime: str, data: bytes) -> str:
     n = (name or "").lower()
@@ -32,6 +46,6 @@ def extract_text_from_file(name: str, mime: str, data: bytes) -> str:
         return extract_text_from_docx(data)
     # plaintext fallback
     try:
-        return _clean(data.decode("utf-8", errors="ignore"))
+        return normalize_for_parse(data.decode("utf-8", errors="ignore"))
     except Exception:
         return ""
