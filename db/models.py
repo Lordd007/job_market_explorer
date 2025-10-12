@@ -19,6 +19,7 @@ class Job(Base):
     job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    seniority: Mapped[str | None] = mapped_column(Text, nullable=True)
     company: Mapped[str] = mapped_column(Text, nullable=False)
 
     city: Mapped[str | None] = mapped_column(Text, default="N/A", server_default="N/A")
@@ -31,6 +32,7 @@ class Job(Base):
     salary_max: Mapped[float] = mapped_column(Numeric, default=0.0, server_default="0")
     salary_currency: Mapped[str] = mapped_column(Text, default="USD", server_default="USD")
     salary_period: Mapped[str] = mapped_column(Text, default="yearly", server_default="yearly")
+    salary_usd_annual: Mapped[float | None] = mapped_column(Numeric, nullable=True)
 
     posted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
@@ -48,6 +50,8 @@ class Job(Base):
     __table_args__ = (
         UniqueConstraint("url_hash", name="jobs_url_hash_uq"),
         Index("jobs_desc_hash_idx", "desc_hash"),
+        # Index("jobs_seniority_idx", "seniority"),
+        # Index("jobs_salary_usd_idx", "salary_usd_annual"),
     )
 
 

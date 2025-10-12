@@ -18,6 +18,8 @@ from ingest.skills_extract import build_matcher, extract
 from ingest.dedupe import canonicalize_url, normalize_text, sha256_bytes
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import insert
+from utils.seniority import infer_seniority
+from utils.salary import normalize_salary
 
 HEADERS = {"User-Agent": "JobMarketExplorer/0.1 (academic/portfolio use)"}
 CONCURRENCY = 8
@@ -258,8 +260,15 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                 url=it.get("url"),
                 url_hash=url_hash,
                 description_text=it.get("description_text", ""),
-                desc_hash=desc_bin,  # <-- NEW column for now
-                )
+                desc_hash=desc_bin,
+                seniority=infer_seniority(it.get("title")),
+                salary_usd_annual=normalize_salary(
+                    it.get("salary_min"),
+                    it.get("salary_max"),
+                    it.get("salary_currency"),
+                    it.get("salary_period"),
+                    ),
+            )
             db.add(job)
             #db.flush()
 
