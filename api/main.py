@@ -7,6 +7,8 @@ from api.routers import preferences
 from api.routers import recommendations
 from api.routers import trends
 from api.routers import metrics, cities
+from api.metrics import MetricsMiddleware, metrics_endpoint
+
 import os, json
 
 app = FastAPI(title="Job Market Explorer")
@@ -59,4 +61,6 @@ app.include_router(recommendations.router, prefix="/api")
 app.include_router(trends.router, prefix="/api")
 app.include_router(metrics.router, prefix="/api")
 app.include_router(cities.router, prefix="/api")
+app.add_middleware(MetricsMiddleware)
+app.add_route("/metrics", metrics_endpoint, methods=["GET"])
 errors.install(app)

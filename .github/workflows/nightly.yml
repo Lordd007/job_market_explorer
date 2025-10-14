@@ -71,3 +71,13 @@ jobs:
 
       - name: DB sanity checks
         run: python -m scripts.dbcheck
+
+      - name: Email on failure
+        if: failure()
+        run: python -m scripts.notify_email
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+          ALERT_TO: ${{ secrets.ALERT_TO }}
+          ALERT_SUBJECT: "Nightly ingest FAILED"
+          ALERT_BODY: "Check the workflow logs for details."
