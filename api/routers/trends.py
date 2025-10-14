@@ -20,11 +20,17 @@ def rising_skills(
 ):
     city_filter = "AND sw.city = :city" if city else ""
     q = f"""
-    WITH recent AS (
+    WITH bounds AS (
+      SELECT
+        DATE_TRUNC('week', CURRENT_DATE) AS week_anchor,
+        (:weeks::int) AS w,
+        (:base::int) AS b
+    ),
+    recent AS (
       SELECT s.name_canonical AS skill, SUM(sw.postings)::int AS cnt
       FROM skill_weekly sw
-      JOIN skills s ON s.skill_id = sw.skill_id
-      WHERE sw.week_date >= (DATE_TRUNC('week', CURRENT_DATE) - INTERVAL :weeks || ' week')
+      JOIN skills s ON s.skill_id = sw.skill_id, bounds
+      WHERE sw.week_date >= (bounds.week_anchor - (bounds.w * INTERVAL '1 week'))
         {city_filter}
       GROUP BY 1
     ),
@@ -32,8 +38,8 @@ def rising_skills(
       SELECT s.name_canonical AS skill, SUM(sw.postings)::int AS cnt
       FROM skill_weekly sw
       JOIN skills s ON s.skill_id = sw.skill_id
-      WHERE sw.week_date <  (DATE_TRUNC('week', CURRENT_DATE) - INTERVAL :weeks || ' week')
-        AND sw.week_date >= (DATE_TRUNC('week', CURRENT_DATE) - INTERVAL :weeks || ' week' - INTERVAL :base || ' week')
+      WHERE sw.week_date <  (bounds.week_anchor - (bounds.w * INTERVAL '1 week'))
+        AND sw.week_date >= (bounds.week_anchor - ((bounds.w + bounds.b) * INTERVAL '1 week'))
         {city_filter}
       GROUP BY 1
     )

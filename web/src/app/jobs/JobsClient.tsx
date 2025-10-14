@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchJSON } from "@/lib/api";
-import { ALL_CITIES } from "@/data/cities";
+import CitySelect from "@/components/CitySelect";
 
 /* ---------- helpers for consistent location/mode rendering ---------- */
 
@@ -21,19 +21,16 @@ function cleanCity(
   country?: string | null,
   remoteFlag?: boolean
 ): string {
-  // If no vendor string, fall back smartly
   if (!city || !city.trim()) {
     if (remoteFlag) return country ? `Remote - ${country}` : "Remote";
     const parts = [region, country].filter(Boolean);
     return parts.length ? parts.join(", ") : "N/A";
   }
-
-  // Strip common vendor noise from the vendor-provided location string
   const c = city
-    .replace(/^\s*home\s*based\s*-\s*/i, "") // "Home based - EMEA" -> "EMEA"
-    .replace(/\s*\boffice\b.*$/i, "")        // "Emeryville, CA Office" -> "Emeryville, CA"
-    .replace(/\s*remote\s*-\s*.*$/i, "")     // "Remote - US" -> ""
-    .replace(/\s*\bhybrid\b.*$/i, "")        // "Atlanta, GA Hybrid" -> "Atlanta, GA"
+    .replace(/^\s*home\s*based\s*-\s*/i, "")
+    .replace(/\s*\boffice\b.*$/i, "")
+    .replace(/\s*remote\s*-\s*.*$/i, "")
+    .replace(/\s*\bhybrid\b.*$/i, "")
     .trim();
 
   if (!c && remoteFlag) return country ? `Remote - ${country}` : "Remote";
@@ -56,7 +53,7 @@ type Job = {
   posted_at: string | null;
   created_at: string;
   url: string | null;
-  remote_flag?: boolean;        // <-- include if API returns it (it should)
+  remote_flag?: boolean;
 };
 
 type JobsResp = { total: number; page: number; page_size: number; items: Job[] };
@@ -73,7 +70,7 @@ export default function JobsClient() {
   const [q, setQ] = useState("");
   const [skill, setSkill] = useState("");
   const [suggest, setSuggest] = useState<string[]>([]);
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState<string | undefined>(undefined); // <- undefined = "All"
   const [days, setDays] = useState(90);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortMode>("newest");
@@ -84,12 +81,12 @@ export default function JobsClient() {
 
   // hydrate filters from URL on first mount
   useEffect(() => {
-    const q0 = params.get("q") ?? "";
-    const city0 = params.get("city") ?? "";
-    const skill0 = params.get("skill") ?? "";
-    const days0 = Number(params.get("days") ?? 90);
-    const page0 = Number(params.get("page") ?? 1);
-    const sort0 = (params.get("sort") as SortMode) ?? "newest";
+    const q0    = params.get("q") || "";
+    const city0 = params.get("city") || undefined;   // <- undefined when not present
+    const skill0= params.get("skill") || "";
+    const days0 = Number(params.get("days") || 90);
+    const page0 = Number(params.get("page") || 1);
+    const sort0 = (params.get("sort") as SortMode) || "newest";
 
     setQInput(q0); setQ(q0);
     setCity(city0); setSkill(skill0);
@@ -102,7 +99,7 @@ export default function JobsClient() {
   useEffect(() => {
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
-    if (city) sp.set("city", city);
+    if (city) sp.set("city", city);  // omitted when undefined
     if (skill) sp.set("skill", skill);
     if (days) sp.set("days", String(days));
     if (page) sp.set("page", String(page));
@@ -158,8 +155,7 @@ export default function JobsClient() {
 
     if (sort === "title") out.sort((a, b) => a.title.localeCompare(b.title));
     else if (sort === "company") out.sort((a, b) => a.company.localeCompare(b.company));
-    // newest = API order
-    return out;
+    return out;  // newest = API order
   }, [resp, sort, city]);
 
   // UI
@@ -193,26 +189,13 @@ export default function JobsClient() {
           </datalist>
         </div>
 
-        {/* City */}
+        {/* City (dynamic) */}
         <div className="flex flex-col">
-          <label className="text-sm opacity-70">City (US/UK)</label>
-          <select
+          <label className="text-sm opacity-70">City</label>
+          <CitySelect
             value={city}
-            onChange={e => { setPage(1); setCity(e.target.value); }}
-            className="bg-transparent border rounded px-3 py-2 min-w-[200px]"
-          >
-            <option value="">All</option>
-            <optgroup label="United States">
-              {ALL_CITIES.filter(c => c.country === "US").map(c =>
-                <option key={`US-${c.name}`} value={c.name}>{c.name}</option>
-              )}
-            </optgroup>
-            <optgroup label="United Kingdom">
-              {ALL_CITIES.filter(c => c.country === "UK").map(c =>
-                <option key={`UK-${c.name}`} value={c.name}>{c.name}</option>
-              )}
-            </optgroup>
-          </select>
+            onChange={(v) => { setPage(1); setCity(v); }}  // v is string | undefined
+          />
         </div>
 
         {/* Days */}
@@ -258,16 +241,13 @@ export default function JobsClient() {
       )}
 
       {!loading && resp && resp.total === 0 && (
-        <div className="opacity-70">
-          No jobs found. Try clearing filters or increasing the day window.
-        </div>
+        <div className="opacity-70">No jobs found. Try clearing filters or increasing the day window.</div>
       )}
 
       {!loading && resp && resp.total > 0 && (
         <>
           <div className="text-sm opacity-70">
-            Showing {(resp.page - 1) * resp.page_size + 1}–
-            {Math.min(resp.page * resp.page_size, resp.total)} of {resp.total}
+            Showing {(resp.page - 1) * resp.page_size + 1}–{Math.min(resp.page * resp.page_size, resp.total)} of {resp.total}
           </div>
 
           <ul className="divide-y divide-neutral-800 rounded border">
@@ -299,21 +279,11 @@ export default function JobsClient() {
           </ul>
 
           <div className="flex gap-2 items-center pt-4">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="border rounded px-3 py-2 disabled:opacity-50"
-            >
+            <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="border rounded px-3 py-2 disabled:opacity-50">
               Prev
             </button>
-            <div className="text-sm opacity-80">
-              Page {page} / {totalPages}
-            </div>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="border rounded px-3 py-2 disabled:opacity-50"
-            >
+            <div className="text-sm opacity-80">Page {page} / {totalPages}</div>
+            <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="border rounded px-3 py-2 disabled:opacity-50">
               Next
             </button>
           </div>
