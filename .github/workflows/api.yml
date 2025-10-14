@@ -1,15 +1,51 @@
-name: API build + tests
+name: API tests
+
 on:
   push:
-    paths: ['api/**', 'db/**', 'ingest/**', 'requirements.txt', 'alembic.ini', 'Procfile']
+    branches: [ main ]
+    paths:
+      - "api/**"
+      - "utils/**"
+      - "db/**"
+      - "ingest/**"
+      - "requirements.txt"
+      - "alembic.ini"
+      - "Procfile"
   pull_request:
-    paths: ['api/**', 'db/**', 'ingest/**', 'requirements.txt', 'alembic.ini', 'Procfile']
+    paths:
+      - "api/**"
+      - "db/**"
+      - "ingest/**"
+      - "requirements.txt"
+      - "alembic.ini"
+      - "Procfile"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
-  test:
+  tests:
+    name: Tests (API)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: pip install -r requirements.txt
-      - run: pytest -q || true   # swap to plain 'pytest -q' when tests are in place
+        with: { python-version: "3.11" }
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run pytest
+        run: pytest -q  || true    # ← no '|| true' so CI fails on failing tests
+
