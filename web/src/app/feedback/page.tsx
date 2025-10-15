@@ -23,8 +23,9 @@ export default function FeedbackPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setDone(true);
       setForm({ name: "", email: "", subject: "", message: "" });
-    } catch (e: any) {
-      setErr(String(e?.message ?? e));
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setErr(msg);
     } finally {
       setSaving(false);
     }
