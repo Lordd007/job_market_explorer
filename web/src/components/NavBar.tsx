@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { href: "/jobs", label: "Jobs" },
   { href: "/preferences", label: "Preferences" },
-  { href: "/blog", label: "Blog" },
   { href: "/feedback", label: "Feedback" },
   { href: "/support", label: "Support Us" },
 ];
@@ -17,7 +16,7 @@ export default function NavBar() {
       <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
         <Link href="/jobs" className="flex items-center gap-2 font-semibold text-teal-800">
           <span className="text-2xl">🜚</span>
-          <span className="text-xl">ZenSearch</span>
+          <span className="text-xl">JME</span>
         </Link>
         <nav className="flex items-center gap-2">
           {tabs.map(t => {
