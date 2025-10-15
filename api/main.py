@@ -10,6 +10,7 @@ from api.routers import metrics, cities
 from api.metrics import MetricsMiddleware, metrics_endpoint
 from api.routers import feedback
 from api.routers import auth
+from api.routers import account
 
 import os, json
 
@@ -67,5 +68,6 @@ app.add_middleware(MetricsMiddleware)
 app.add_route("/metrics", metrics_endpoint, methods=["GET"])
 app.include_router(feedback.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(account.router, prefix="/api")
 
 errors.install(app)
