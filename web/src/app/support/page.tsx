@@ -5,7 +5,7 @@ const VENMO_HANDLE = "jme-support";
 
 export default function SupportPage() {
   const [amount, setAmount] = useState<string>("10.00");
-  const note = "Support ZenSearch";
+  const note = "Support JME";
   const webUrl = `https://venmo.com/${VENMO_HANDLE}`;
   // Venmo app deep link; some browsers will open the app if installed
   const appUrl = useMemo(() => {
@@ -20,9 +20,9 @@ export default function SupportPage() {
 
   return (
     <main className="space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-bold">Support ZenSearch</h1>
+      <h1 className="text-2xl font-bold">Support JME</h1>
       <p className="text-gray-700">
-        If ZenSearch has been helpful, you can support ongoing hosting and development via Venmo.
+        If JME has been helpful, you can support ongoing hosting and development via Venmo.
       </p>
 
       <div className="rounded-xl border border-teal-200 bg-white p-4 space-y-3">

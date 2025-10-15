@@ -69,7 +69,7 @@ def main(user_id: str = DEMO_USER, days: int = 7, limit: int = 20):
 
         html = HTML_TMPL.format(n=len(rows), rows="\n".join(html_rows))
         text = f"{len(rows)} new jobs for you this week."
-        send_email("Weekly matches from ZenSearch", text, html)
+        send_email("Weekly matches from JME", text, html)
 
     finally:
         db.close()
