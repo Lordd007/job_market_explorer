@@ -1,0 +1,25 @@
+# .github/workflows/sync-heroku-config.yml
+name: Sync Heroku Config
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: [ ".github/workflows/sync-heroku-config.yml" ]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Heroku CLI
+        run: curl https://cli-assets.heroku.com/install.sh | sh
+
+      - name: Set Heroku env vars from GitHub secrets
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_EMAIL:   ${{ secrets.HEROKU_EMAIL }}
+        run: |
+          heroku auth:token >/dev/null 2>&1 || true
+          heroku config:set -a jme-api-staging \
+            GMAIL_USER='${{ secrets.GMAIL_USER }}' \
+            GMAIL_PASS='${{ secrets.GMAIL_PASS }}' \
+            ALERT_TO='${{ secrets.ALERT_TO }}'
