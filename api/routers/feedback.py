@@ -15,7 +15,7 @@ class FeedbackIn(BaseModel):
 @router.post("/feedback")
 def submit_feedback(payload: FeedbackIn):
     try:
-        subj = f"[ZenSearch Feedback] {payload.subject}"
+        subj = f"[JME Feedback] {payload.subject}"
         text = (
             f"Name: {payload.name}\n"
             f"Email: {payload.email}\n"
@@ -23,7 +23,7 @@ def submit_feedback(payload: FeedbackIn):
             f"{payload.message}\n"
         )
         html_body = f"""
-        <h3>ZenSearch Feedback</h3>
+        <h3>JME Feedback</h3>
         <p><b>Name:</b> {html.escape(payload.name)}</p>
         <p><b>Email:</b> {html.escape(str(payload.email))}</p>
         <p><b>Category:</b> {html.escape(payload.category or '-')}</p>
