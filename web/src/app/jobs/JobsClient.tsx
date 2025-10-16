@@ -257,7 +257,7 @@ export default function JobsClient() {
               const when = new Date(j.posted_at || j.created_at).toLocaleDateString();
 
               return (
-                <li key={j.job_id} className="p-4 hover:bg-neutral-900">
+                <li key={j.job_id} className="p-4 hover:bg-white/70 transition-colors border-b border-teal-100">
                   <div className="flex justify-between gap-4 flex-wrap">
                     <div>
                       <div className="font-semibold">{j.title}</div>

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query
+# api/routers/trends.py
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql
 from db.session import SessionLocal
@@ -12,49 +13,70 @@ def get_db():
 
 @router.get("/skills/rising")
 def rising_skills(
+    weeks: int = Query(8, ge=1, le=26),
+    baseline_weeks: int = Query(8, ge=1, le=26),
+    min_support: int = Query(20, ge=0, le=100000),
+    limit: int = Query(20, ge=1, le=200),
     city: str | None = None,
-    weeks: int = Query(8, ge=4, le=52),
-    baseline_weeks: int = Query(8, ge=2, le=52),
-    min_support: int = Query(20, ge=1),
     db: Session = Depends(get_db),
 ):
-    city_filter = "AND sw.city = :city" if city else ""
-    q = f"""
-    WITH bounds AS (
-      SELECT
-        DATE_TRUNC('week', CURRENT_DATE) AS week_anchor,
-        (:weeks::int) AS w,
-        (:base::int) AS b
-    ),
-    recent AS (
-      SELECT s.name_canonical AS skill, SUM(sw.postings)::int AS cnt
-      FROM skill_weekly sw
-      JOIN skills s ON s.skill_id = sw.skill_id, bounds
-      WHERE sw.week_date >= (bounds.week_anchor - (bounds.w * INTERVAL '1 week'))
-        {city_filter}
-      GROUP BY 1
+    """
+    Compares the last `weeks` vs the preceding `baseline_weeks`.
+    If `city` is provided, restrict to that city label stored in skill_weekly.city.
+    """
+    # WHERE snippets depending on city
+    city_cond = "AND city = :city" if city else ""
+    params = {
+        "weeks": weeks,
+        "baseline_weeks": baseline_weeks,
+        "min_support": min_support,
+        "limit": limit,
+    }
+    if city:
+        params["city"] = city
+
+    q = sql(f"""
+    WITH cur AS (
+      SELECT skill_id, SUM(postings)::int AS n
+      FROM skill_weekly
+      WHERE week_date >= date_trunc('week', now()::date) - (:weeks || ' weeks')::interval
+        {city_cond}
+      GROUP BY skill_id
     ),
     base AS (
-      SELECT s.name_canonical AS skill, SUM(sw.postings)::int AS cnt
-      FROM skill_weekly sw
-      JOIN skills s ON s.skill_id = sw.skill_id
-      WHERE sw.week_date <  (bounds.week_anchor - (bounds.w * INTERVAL '1 week'))
-        AND sw.week_date >= (bounds.week_anchor - ((bounds.w + bounds.b) * INTERVAL '1 week'))
-        {city_filter}
-      GROUP BY 1
+      SELECT skill_id, SUM(postings)::int AS n
+      FROM skill_weekly
+      WHERE week_date >= date_trunc('week', now()::date) - ((:weeks + :baseline_weeks) || ' weeks')::interval
+        AND week_date <  date_trunc('week', now()::date) - (:weeks || ' weeks')::interval
+        {city_cond}
+      GROUP BY skill_id
     )
-    SELECT COALESCE(r.skill,b.skill) AS skill,
-           COALESCE(r.cnt,0)  AS recent_cnt,
-           COALESCE(b.cnt,0)  AS base_cnt,
-           CASE WHEN COALESCE(b.cnt,0) = 0 THEN NULL
-                ELSE ROUND(((COALESCE(r.cnt,0)-b.cnt)::numeric / NULLIF(b.cnt,0)) * 100,1) END AS pct_delta
-    FROM recent r
-    FULL OUTER JOIN base b ON b.skill = r.skill
-    WHERE COALESCE(r.cnt,0) + COALESCE(b.cnt,0) >= :min_support
-    ORDER BY pct_delta DESC NULLS LAST, recent_cnt DESC
-    LIMIT 50
-    """
-    rows = db.execute(sql(q), {
-        "weeks": weeks, "base": baseline_weeks, "min_support": min_support, "city": city
-    }).mappings().all()
-    return rows
+    SELECT s.name_canonical AS skill,
+           COALESCE(cur.n, 0) AS cur_n,
+           COALESCE(base.n, 0) AS base_n,
+           /* if base==0 and cur>=min_support call it a huge delta, else compute % change */
+           CASE WHEN COALESCE(base.n,0)=0
+                    THEN CASE WHEN COALESCE(cur.n,0)>=:min_support THEN 9999.0 ELSE 0.0 END
+                ELSE (cur.n - base.n)::float / base.n
+           END AS delta,
+           COALESCE(cur.n,0) + COALESCE(base.n,0) AS support
+    FROM cur
+    JOIN skills s ON s.skill_id = cur.skill_id
+    LEFT JOIN base ON base.skill_id = cur.skill_id
+    WHERE COALESCE(cur.n,0) >= :min_support
+    ORDER BY delta DESC, cur_n DESC
+    LIMIT :limit;
+    """)
+
+    rows = db.execute(q, params).mappings().all()
+    # normalize payload
+    return [
+        {
+            "skill": r["skill"],
+            "current": int(r["cur_n"]),
+            "baseline": int(r["base_n"]),
+            "delta": float(r["delta"]),
+            "support": int(r["support"]),
+        }
+        for r in rows
+    ]

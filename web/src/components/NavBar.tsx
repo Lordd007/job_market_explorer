@@ -64,7 +64,7 @@ export default function NavBar() {
           {!authed ? (
             <Link
               href="/login"
-              className="ml-2 px-3 py-1.5 rounded-md bg-teal-600 text-white text-sm"
+              className="ml-2 px-3 py-1.5 rounded-md bg-white border border-teal-300 text-teal-800"
             >
               Log In
             </Link>

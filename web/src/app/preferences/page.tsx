@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { fetchJSON } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 
 type Prefs = {
   cities: string[];
@@ -26,35 +27,31 @@ export default function PreferencesPage() {
 
   // load existing from localStorage
   useEffect(() => {
-    const raw = localStorage.getItem("prefs");
-    if (raw) {
-      try { setPrefs({ ...DEFAULTS, ...JSON.parse(raw) }); } catch {}
-    }
-    fetchJSON<{city:string;n:number}[]>("/api/cities", { min_support: 30 })
-      .then(setCities)
-      .catch(() => setCities([]));
+    const t = getToken();
+    if (!t) { setMsg("Not logged in — changes will be saved locally."); return; }
+    fetchJSON<Prefs>("/api/user/preferences", {}, { authorization: `Bearer ${t}` })
+      .then(p => { setPrefs(p); setMsg(""); })
+      .catch(() => setMsg("Could not load from server — using local values."));
   }, []);
+
+  function saveLocal(p: Prefs) { localStorage.setItem("prefs", JSON.stringify(p)); }
 
   function update<K extends keyof Prefs>(key: K, value: Prefs[K]) {
     setPrefs(p => ({ ...p, [key]: value }));
   }
 
   async function save() {
-    setSaving(true); setMsg(null);
-    localStorage.setItem("prefs", JSON.stringify(prefs));
+    const t = getToken();
+    if (!t) { saveLocal(prefs); setMsg("Saved locally (not logged in)."); return; }
     try {
-      // optional server save (will 404 if endpoint not implemented)
-      const res = await fetch("/api/user/preferences", {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify(prefs),
+      await fetchJSON("/api/user/preferences", {}, {
+        authorization: `Bearer ${t}`,
+        method: "PUT",
+        json: prefs
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setMsg("Saved to server and local");
+      setMsg("Saved to server.");
     } catch {
-      setMsg("Saved locally (server endpoint not available)");
-    } finally {
-      setSaving(false);
+      saveLocal(prefs); setMsg("Server endpoint not available — saved locally.");
     }
   }
 
@@ -151,7 +148,7 @@ export default function PreferencesPage() {
       >
         {saving ? "Saving..." : "Save preferences"}
       </button>
-      {msg && <div className="text-sm text-gray-600">{msg}</div>}
+      {msg && <div className="mt-2 text-sm opacity-70">{msg}</div>}
     </main>
   );
 }

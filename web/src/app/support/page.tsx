@@ -45,7 +45,7 @@ export default function SupportPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <a href={appUrl} className="px-3 py-2 rounded bg-teal-600 text-white">
+          <a href={appUrl} className="px-3 py-2 rounded border border-teal-300 text-teal-700 hover:bg-teal-50">
             Open Venmo App
           </a>
           <a href={webUrl} target="_blank" rel="noreferrer"
