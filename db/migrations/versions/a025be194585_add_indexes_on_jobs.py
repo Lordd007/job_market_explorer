@@ -19,22 +19,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade():
-    # pg_trgm (safe if already installed)
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
 
-    # CONCURRENTLY must be autocommit
     with op.get_context().autocommit_block():
-        # Case-insensitive equality/prefix lookups
-        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_city_idx       ON jobs (lower(city))")
-        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_region_idx     ON jobs (lower(region))")
-        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_country_idx    ON jobs (lower(country))")
-        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_title_lw_idx   ON jobs (lower(title))")
-        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_company_lw_idx ON jobs (lower(company))")
+        # case-insensitive lookups
+        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_city_idx        ON jobs (lower(city))")
+        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_region_idx      ON jobs (lower(region))")
+        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_country_idx     ON jobs (lower(country))")
+        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_title_lw_idx    ON jobs (lower(title))")
+        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_company_lw_idx  ON jobs (lower(company))")
 
-        # Order by "most recent" (planner can scan btree backward for DESC)
-        op.execute("CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_ts_idx ON jobs ((COALESCE(posted_at, created_at)))")
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_recent_idx "
+            "ON jobs (posted_at DESC NULLS LAST, created_at DESC)"
+        )
 
-        # Trigram GIN for contains/ILIKE on description_text
+        # trigram GIN on description_text (not 'description')
         op.execute(
             "CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_desc_trgm_idx "
             "ON jobs USING gin (lower(description_text) gin_trgm_ops)"
@@ -43,9 +43,10 @@ def upgrade():
 def downgrade():
     with op.get_context().autocommit_block():
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_desc_trgm_idx")
-        op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_ts_idx")
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_recent_idx")
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_company_lw_idx")
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_title_lw_idx")
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_country_idx")
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_region_idx")
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS jobs_city_idx")
+

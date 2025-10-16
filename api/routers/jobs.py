@@ -47,9 +47,9 @@ def list_jobs(
 
     # NOTE: replace column names if yours differ.
     stmt = sql("""
-    WITH base AS (  -- restrict by time first
+    WITH base AS (  -- restrict by time first (no COALESCE here)
       SELECT
-        j.id,
+        j.job_id,
         j.title,
         j.company,
         j.city,
@@ -58,17 +58,17 @@ def list_jobs(
         j.posted_at,
         j.created_at,
         j.url,
-        COALESCE(j.posted_at, j.created_at) AS ts,
-        /* Optional column in schema; if absent it's OK, we recompute below */
         COALESCE(j.remote_flag, false) AS remote_flag_src,
-        COALESCE(j.description, '') AS description
+        COALESCE(j.description_text, '') AS description
       FROM jobs j
-      WHERE COALESCE(j.posted_at, j.created_at) >= (NOW() - (:days || ' days')::interval)
+      WHERE
+        (j.posted_at IS NOT NULL AND j.posted_at >= (NOW() - (:days || ' days')::interval))
+        OR
+        (j.posted_at IS NULL AND j.created_at >= (NOW() - (:days || ' days')::interval))
     ),
-    -- Lower/cased + country code normalization
     loc_base AS (
       SELECT
-        id, title, company, city, region, country, posted_at, created_at, url, ts, remote_flag_src, description,
+        job_id, title, company, city, region, country, posted_at, created_at, url, remote_flag_src, description,
         LOWER(COALESCE(city,''))   AS city_l,
         UPPER(COALESCE(region,'')) AS region_u,
         CASE WHEN UPPER(COALESCE(country,''))='GB' THEN 'UK' ELSE UPPER(COALESCE(country,'')) END AS country_u
@@ -83,13 +83,15 @@ def list_jobs(
     ),
     step1 AS (
       SELECT
-        id, title, company, region_u, country_u, posted_at, created_at, url, ts, remote_flag_src, description, has_remote_kw, has_hybrid_kw,
+        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description,
+        has_remote_kw, has_hybrid_kw,
         REGEXP_REPLACE(city_l, '\\s*\\((?:remote|hybrid|in-?office|distributed|home\\s*based)\\)\\s*$', '', 'i') AS s1
       FROM flags
     ),
     step2 AS (
       SELECT
-        id, title, company, region_u, country_u, posted_at, created_at, url, ts, remote_flag_src, description, has_remote_kw, has_hybrid_kw,
+        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description,
+        has_remote_kw, has_hybrid_kw,
         REGEXP_REPLACE(
           s1,
           '^\\s*(?:remote|hybrid|in-?office|office|distributed|home\\s*based)\\b\\s*(?:[-—–:,/]|to|and)?\\s*',
@@ -100,7 +102,8 @@ def list_jobs(
     ),
     tokens AS (
       SELECT
-        id, title, company, region_u, country_u, posted_at, created_at, url, ts, remote_flag_src, description, has_remote_kw, has_hybrid_kw,
+        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description,
+        has_remote_kw, has_hybrid_kw,
         NULLIF(TRIM(SUBSTRING(s2 FROM '^[^,;/|]+')), '') AS ccity_raw
       FROM step2
     ),
@@ -113,33 +116,25 @@ def list_jobs(
         ) AS is_city
       FROM tokens
     ),
-    norm AS (  -- compute normalized city + mode + remote flag
+    norm AS (
       SELECT
-        id, title, company, posted_at, created_at, url, region_u, country_u, description, ts,
-        /* City normalization */
+        job_id, title, company, posted_at, created_at, url, region_u, country_u, description,
         CASE
-          WHEN is_city AND country_u='US' AND region_u ~ '^[A-Z]{2}$'
-            THEN INITCAP(ccity_raw) || ', ' || region_u
-          WHEN is_city AND country_u<>''
-            THEN INITCAP(ccity_raw) || ', ' || country_u
-          WHEN is_city
-            THEN INITCAP(ccity_raw)
-          WHEN NOT is_city AND has_remote_kw AND country_u<>'' THEN 'Remote, ' || country_u
-          WHEN NOT is_city AND has_remote_kw THEN 'Remote'
-          WHEN region_u<>'' AND country_u<>'' THEN INITCAP(region_u) || ', ' || country_u
-          WHEN region_u<>'' THEN INITCAP(region_u)
-          WHEN country_u<>'' THEN country_u
+          WHEN is_city AND country_u='US' AND region_u ~ '^[A-Z]{2}$' THEN INITCAP(ccity_raw) || ', ' || region_u
+          WHEN is_city AND country_u<>''                             THEN INITCAP(ccity_raw) || ', ' || country_u
+          WHEN is_city                                              THEN INITCAP(ccity_raw)
+          WHEN NOT is_city AND has_remote_kw AND country_u<>''      THEN 'Remote, ' || country_u
+          WHEN NOT is_city AND has_remote_kw                        THEN 'Remote'
+          WHEN region_u<>'' AND country_u<>''                       THEN INITCAP(region_u) || ', ' || country_u
+          WHEN region_u<>''                                         THEN INITCAP(region_u)
+          WHEN country_u<>''                                        THEN country_u
           ELSE NULL
         END AS city_norm,
-
-        /* Mode: prefer explicit remote flag or keywords, then hybrid, else on-site */
         CASE
           WHEN remote_flag_src OR has_remote_kw THEN 'Remote'
-          WHEN has_hybrid_kw THEN 'Hybrid'
+          WHEN has_hybrid_kw                    THEN 'Hybrid'
           ELSE 'On-site'
         END AS mode_norm,
-
-        /* Boolean remote flag for your UI helper */
         (remote_flag_src OR has_remote_kw) AS remote_flag
       FROM city_like
     ),
@@ -147,33 +142,29 @@ def list_jobs(
       SELECT *
       FROM norm
       WHERE
-        -- q over title/company/desc/url
         (:q = '' OR title ILIKE :q_like OR company ILIKE :q_like OR description ILIKE :q_like OR url ILIKE :q_like)
-        -- skill filter: tries job_skills, falls back to description
         AND (
           :skill = ''
-          OR EXISTS (SELECT 1 FROM job_skills js WHERE js.job_id = norm.id AND js.skill ILIKE :skill_like)
+          OR EXISTS (SELECT 1 FROM job_skills js WHERE js.job_id = norm.job_id AND js.skill ILIKE :skill_like)
           OR description ILIKE :skill_like
         )
-        -- mode filter
         AND (:mode_canon IS NULL OR mode_norm = :mode_canon)
-        -- city filter (exact match on normalized form)
         AND (:city IS NULL OR :city = '' OR city_norm = :city)
     )
     SELECT
-      id::text                 AS job_id,
+      job_id::text AS job_id,
       title,
       company,
-      NULLIF(TRIM((SELECT city FROM jobs j2 WHERE j2.id = filtered.id)), '') AS city,  -- original text back
-      (SELECT region FROM jobs j2 WHERE j2.id = filtered.id)  AS region,
-      (SELECT country FROM jobs j2 WHERE j2.id = filtered.id) AS country,
+      (SELECT city    FROM jobs j2 WHERE j2.job_id = filtered.job_id) AS city,
+      (SELECT region  FROM jobs j2 WHERE j2.job_id = filtered.job_id) AS region,
+      (SELECT country FROM jobs j2 WHERE j2.job_id = filtered.job_id) AS country,
       posted_at,
       created_at,
       url,
       remote_flag,
       COUNT(*) OVER()::int AS total
     FROM filtered
-    ORDER BY ts DESC NULLS LAST
+    ORDER BY posted_at DESC NULLS LAST, created_at DESC  -- << newest
     LIMIT :limit OFFSET :offset;
     """)
 
