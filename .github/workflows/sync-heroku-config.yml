@@ -22,4 +22,5 @@ jobs:
           heroku config:set -a jme-api-staging \
             GMAIL_USER='${{ secrets.GMAIL_USER }}' \
             GMAIL_PASS='${{ secrets.GMAIL_PASS }}' \
+            JWT_SECRET='${{ secrets.JWT_SECRET }}' \
             ALERT_TO='${{ secrets.ALERT_TO }}'
