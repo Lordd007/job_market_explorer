@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchJSON } from "@/lib/api";
 import CitySelect from "@/components/CitySelect";
+import ModeSelect from "@/components/ModeSelect";
 
 /* ---------- helpers for consistent location/mode rendering ---------- */
 
@@ -22,7 +23,7 @@ function cleanCity(
   remoteFlag?: boolean
 ): string {
   if (!city || !city.trim()) {
-    if (remoteFlag) return country ? `Remote - ${country}` : "Remote";
+    if (remoteFlag) return country ? `Remote, ${country}` : "Remote";
     const parts = [region, country].filter(Boolean);
     return parts.length ? parts.join(", ") : "N/A";
   }
@@ -33,7 +34,7 @@ function cleanCity(
     .replace(/\s*\bhybrid\b.*$/i, "")
     .trim();
 
-  if (!c && remoteFlag) return country ? `Remote - ${country}` : "Remote";
+  if (!c && remoteFlag) return country ? `Remote, ${country}` : "Remote";
   if (!c) {
     const parts = [region, country].filter(Boolean);
     return parts.length ? parts.join(", ") : "N/A";
@@ -71,6 +72,7 @@ export default function JobsClient() {
   const [skill, setSkill] = useState("");
   const [suggest, setSuggest] = useState<string[]>([]);
   const [city, setCity] = useState<string | undefined>(undefined); // <- undefined = "All"
+  const [mode, setMode] = useState<string>("");
   const [days, setDays] = useState(90);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortMode>("newest");
@@ -97,15 +99,16 @@ export default function JobsClient() {
 
   // persist filters to URL (shallow)
   useEffect(() => {
-    const sp = new URLSearchParams();
-    if (q) sp.set("q", q);
-    if (city) sp.set("city", city);  // omitted when undefined
-    if (skill) sp.set("skill", skill);
-    if (days) sp.set("days", String(days));
-    if (page) sp.set("page", String(page));
-    if (sort && sort !== "newest") sp.set("sort", sort);
-    router.replace(`/jobs?${sp.toString()}`, { scroll: false });
-  }, [q, city, skill, days, page, sort, router]);
+      const sp = new URLSearchParams();
+      if (q) sp.set("q", q);
+      if (city) sp.set("city", city);
+      if (mode) sp.set("mode", mode);
+      if (skill) sp.set("skill", skill);
+      if (days) sp.set("days", String(days));
+      if (page) sp.set("page", String(page));
+      if (sort && sort !== "newest") sp.set("sort", sort);
+      router.replace(`/jobs?${sp.toString()}`, { scroll: false });
+    }, [q, city, mode, skill, days, page, sort, router]);
 
   // debounce search input → q
   useEffect(() => {
@@ -115,17 +118,17 @@ export default function JobsClient() {
 
   // fetch jobs
   useEffect(() => {
-    const ac = new AbortController();
-    setLoading(true);
-    setError(null);
+      const ac = new AbortController();
+      setLoading(true);
+      setError(null);
 
-    fetchJSON<JobsResp>("/api/jobs", { q, city, skill, days, page, page_size: 20 })
-      .then((data) => { if (!ac.signal.aborted) setResp(data); })
-      .catch((e) => { if (!ac.signal.aborted) setError(String(e)); })
-      .finally(() => { if (!ac.signal.aborted) setLoading(false); });
+      fetchJSON<JobsResp>("/api/jobs", { q, city, mode, skill, days, page, page_size: 20 }) // add mode
+        .then((data) => { if (!ac.signal.aborted) setResp(data); })
+        .catch((e) => { if (!ac.signal.aborted) setError(String(e)); })
+        .finally(() => { if (!ac.signal.aborted) setLoading(false); });
 
-    return () => ac.abort();
-  }, [q, city, skill, days, page]);
+      return () => ac.abort();
+    }, [q, city, mode, skill, days, page]);
 
   // skill typeahead
   useEffect(() => {
@@ -148,10 +151,6 @@ export default function JobsClient() {
     if (!resp) return [];
     let out = [...resp.items];
 
-    // optional: when a city is selected, hide pure-remote rows
-    if (city) {
-      out = out.filter(j => !j.remote_flag);
-    }
 
     if (sort === "title") out.sort((a, b) => a.title.localeCompare(b.title));
     else if (sort === "company") out.sort((a, b) => a.company.localeCompare(b.company));
@@ -189,14 +188,25 @@ export default function JobsClient() {
           </datalist>
         </div>
 
+        {/* Mode */}
+        <div className="flex flex-col">
+          <label className="text-sm opacity-70">Mode</label>
+          <ModeSelect
+            value={mode}
+            onChange={(v) => { setPage(1); setMode(v); }}
+          />
+        </div>
+
         {/* City (dynamic) */}
         <div className="flex flex-col">
           <label className="text-sm opacity-70">City</label>
           <CitySelect
             value={city}
-            onChange={(v) => { setPage(1); setCity(v); }}  // v is string | undefined
+            onChange={(v) => { setPage(1); setCity(v); }}
+            placeholder="All"
           />
         </div>
+
 
         {/* Days */}
         <div className="flex flex-col">

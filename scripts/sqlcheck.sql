@@ -1,1 +1,1 @@
-CREATE INDEX IF NOT EXISTS job_skills_skill_idx ON job_skills(skill_id)
+

@@ -1,12 +1,14 @@
 "use client";
 import React, { useState } from "react";
 import CitySelect from "@/components/CitySelect";
+import ModeSelect from "@/components/ModeSelect";
 import RisingSkillsCard from "@/components/RisingSkillsCard";
 import SalaryCard from "@/components/SalaryCard";
 
 export default function InsightsRow() {
   const [city, setCity] = useState<string | undefined>(undefined);
   const [skill, setSkill] = useState<string>("go");
+  const [mode, setMode] = useState<string>("");
 
   return (
     <section className="mb-4">
@@ -25,6 +27,7 @@ export default function InsightsRow() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <RisingSkillsCard city={city} />
         <SalaryCard skill={skill} city={city} />
+        <ModeSelect value={mode} onChange={setMode} />
       </div>
     </section>
   );
