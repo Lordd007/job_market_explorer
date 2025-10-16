@@ -7,6 +7,7 @@ from db.models import User
 from api.services.emailer import send_email
 from core.security import create_access_token
 import datetime as dt, random, html
+import os, uuid
 
 router = APIRouter(tags=["auth"])
 
@@ -50,9 +51,10 @@ def request_code(payload: RequestCodeIn):
     body = f"Your code is: {code}\nThis code expires in 10 minutes."
     html_body = f"<p>Your code is: <b>{html.escape(code)}</b></p><p>It expires in 10 minutes.</p>"
     # send (reply-to set to the email so you can reply if needed)
-    send_email(subject=subj, text=body, html=html_body, reply_to=email)
+    send_email(subject=subj, text=body, html=html_body, to_addrs=email, reply_to=os.getenv("ALERT_TO", email))
 
     return {"ok": True}
+
 
 @router.post("/auth/verify_code")
 def verify_code(payload: VerifyCodeIn):
@@ -72,7 +74,6 @@ def verify_code(payload: VerifyCodeIn):
             raise HTTPException(400, "Code expired. Request a new one.")
 
         if row["code"] != code:
-            # bump attempts
             db.execute(sql("UPDATE auth_login_code SET attempts = attempts + 1 WHERE email=:e"), {"e": email})
             db.commit()
             raise HTTPException(400, "Invalid code")
@@ -80,18 +81,20 @@ def verify_code(payload: VerifyCodeIn):
         # mark used
         db.execute(sql("UPDATE auth_login_code SET used_at = now() WHERE email = :e"), {"e": email})
 
-        # ensure user exists
+        # ensure user exists (race-safe + email unique)
         user = db.query(User).filter(User.email == email).first()
         if not user:
-            # create default auth_sub = email (simple); you can change to sub from provider later
+            new_id = uuid.uuid4()
             db.execute(sql("""
-              INSERT INTO users(user_id, auth_sub, email, created_at)
-              VALUES (gen_random_uuid(), :sub, :email, now())
+              INSERT INTO users (user_id, auth_sub, email, created_at)
+              VALUES (:uid, :sub, :email, now())
               ON CONFLICT (email) DO NOTHING
-            """), {"sub": email, "email": email})
+            """), {"uid": str(new_id), "sub": email, "email": email})
             user = db.query(User).filter(User.email == email).first()
 
         db.commit()
 
-    token = create_access_token(sub=str(user.user_id), extra={"email": email})
-    return {"access_token": token, "token_type": "bearer", "user": {"user_id": str(user.user_id), "email": email}}
+        token = create_access_token(sub=str(user.user_id), extra={"email": email})
+        return {"access_token": token, "token_type": "bearer",
+                "user": {"user_id": str(user.user_id), "email": email}}
+
