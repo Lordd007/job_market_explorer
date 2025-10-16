@@ -1,33 +1,47 @@
 "use client";
-import React, { useEffect, useState } from "react";
+
+import { useEffect, useState } from "react";
 import { fetchJSON } from "@/lib/api";
 
-export default function CitySelect({ value, onChange }: { value?: string; onChange: (v?: string)=>void }) {
-  const [cities, setCities] = useState<{city:string; n:number}[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+type CityRow = { city: string; count?: number; n?: number };
+
+type Props = {
+  value?: string;
+  onChange: (val?: string) => void;
+  placeholder?: string;      // <-- add this
+  className?: string;
+};
+
+export default function CitySelect({
+  value,
+  onChange,
+  placeholder = "All",
+  className = "",
+}: Props) {
+  const [items, setItems] = useState<CityRow[]>([]);
 
   useEffect(() => {
-    let m = true;
-    fetchJSON<{city:string; n:number}[]>("/api/cities", { min_support: 50 })
-      .then(d => m && setCities(d))
-      .catch(e => m && setErr(String(e)));
-    return () => { m = false; };
+    // tolerant to either `count` or `n`
+    fetchJSON<CityRow[]>("/api/cities", { min_count: 5, limit: 500 })
+      .then(setItems)
+      .catch(() => setItems([]));
   }, []);
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-600">City:</span>
-      <select
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value || undefined)}
-        className="rounded-md border px-2 py-1"
-      >
-        <option value="">All</option>
-        {cities.map(c => (
-          <option key={c.city} value={c.city}>{c.city} ({c.n})</option>
-        ))}
-      </select>
-      {err && <span className="text-xs text-red-500">{err}</span>}
-    </div>
+    <select
+      value={value ?? ""}                               // keep "" for "All"
+      onChange={(e) => onChange(e.target.value || undefined)}
+      className={`rounded border border-teal-200 px-3 py-2 bg-white text-slate-900 ${className}`}
+    >
+      <option value="">{placeholder}</option>
+      {items.map((r) => {
+        const cnt = r.count ?? r.n ?? 0;
+        return (
+          <option key={r.city} value={r.city}>
+            {r.city}{cnt ? ` (${cnt})` : ""}
+          </option>
+        );
+      })}
+    </select>
   );
 }
