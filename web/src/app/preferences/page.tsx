@@ -21,37 +21,67 @@ const DEFAULTS: Prefs = {
 
 export default function PreferencesPage() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
-  const [cities, setCities] = useState<{city:string;n:number}[]>([]);
+  const [cities, setCities] = useState<{ city: string; n: number }[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // load existing from localStorage
+  // load cities list (dynamic)
   useEffect(() => {
-    const t = getToken();
-    if (!t) { setMsg("Not logged in — changes will be saved locally."); return; }
-    fetchJSON<Prefs>("/api/user/preferences", {}, { authorization: `Bearer ${t}` })
-      .then(p => { setPrefs(p); setMsg(""); })
-      .catch(() => setMsg("Could not load from server — using local values."));
+    fetchJSON<{ city: string; n: number }[]>("/api/cities")
+      .then(setCities)
+      .catch(() => setCities([]));
   }, []);
 
-  function saveLocal(p: Prefs) { localStorage.setItem("prefs", JSON.stringify(p)); }
+  // load existing prefs (server if token, else local)
+  useEffect(() => {
+    const t = getToken();
+    if (!t) {
+      // try local first
+      const local = localStorage.getItem("prefs");
+      if (local) setPrefs({ ...DEFAULTS, ...JSON.parse(local) });
+      setMsg("Not logged in — changes will be saved locally.");
+      return;
+    }
+    fetchJSON<Prefs>("/api/user/preferences", {}, { authorization: `Bearer ${t}` })
+      .then((p) => {
+        setPrefs({ ...DEFAULTS, ...p });
+        setMsg(null);
+      })
+      .catch(() => {
+        const local = localStorage.getItem("prefs");
+        if (local) setPrefs({ ...DEFAULTS, ...JSON.parse(local) });
+        setMsg("Could not load from server — using local values.");
+      });
+  }, []);
+
+  function saveLocal(p: Prefs) {
+    localStorage.setItem("prefs", JSON.stringify(p));
+  }
 
   function update<K extends keyof Prefs>(key: K, value: Prefs[K]) {
-    setPrefs(p => ({ ...p, [key]: value }));
+    setPrefs((p) => ({ ...p, [key]: value }));
   }
 
   async function save() {
     const t = getToken();
-    if (!t) { saveLocal(prefs); setMsg("Saved locally (not logged in)."); return; }
+    setSaving(true);
     try {
+      if (!t) {
+        saveLocal(prefs);
+        setMsg("Saved locally (not logged in).");
+        return;
+      }
       await fetchJSON("/api/user/preferences", {}, {
         authorization: `Bearer ${t}`,
         method: "PUT",
-        json: prefs
+        json: prefs,
       });
       setMsg("Saved to server.");
     } catch {
-      saveLocal(prefs); setMsg("Server endpoint not available — saved locally.");
+      saveLocal(prefs);
+      setMsg("Server endpoint not available — saved locally.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -63,32 +93,41 @@ export default function PreferencesPage() {
       <section className="rounded-xl border border-teal-200 bg-white p-4">
         <h2 className="font-semibold mb-2">Cities</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {cities.map(c => {
+          {cities.map((c) => {
             const sel = prefs.cities.includes(c.city);
             return (
-              <label key={c.city} className={`px-2 py-1 rounded border cursor-pointer ${sel ? "bg-teal-50 border-teal-300" : "bg-white border-gray-300"}`}>
+              <label
+                key={c.city}
+                className={`px-2 py-1 rounded border cursor-pointer ${
+                  sel ? "bg-teal-50 border-teal-300" : "bg-white border-gray-300"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={sel}
                   onChange={(e) => {
                     const next = e.target.checked
                       ? [...prefs.cities, c.city]
-                      : prefs.cities.filter(x => x !== c.city);
+                      : prefs.cities.filter((x) => x !== c.city);
                     update("cities", next);
                   }}
                   className="mr-2"
                 />
-                {c.city} <span className="text-xs text-gray-500">({c.n})</span>
+                {c.city}{" "}
+                <span className="text-xs text-gray-500">({c.n})</span>
               </label>
             );
           })}
+          {!cities.length && (
+            <div className="text-sm opacity-70">No city data found.</div>
+          )}
         </div>
       </section>
 
       {/* Remote mode */}
       <section className="rounded-xl border border-teal-200 bg-white p-4">
         <h2 className="font-semibold mb-2">Remote/Onsite</h2>
-        {["any","remote","hybrid","office"].map(m => (
+        {["any", "remote", "hybrid", "office"].map((m) => (
           <label key={m} className="mr-4">
             <input
               type="radio"
@@ -109,7 +148,12 @@ export default function PreferencesPage() {
           className="w-full rounded border border-gray-300 px-3 py-2"
           placeholder="comma-separated, e.g. python, sql, tableau"
           value={prefs.target_skills.join(", ")}
-          onChange={(e) => update("target_skills", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+          onChange={(e) =>
+            update(
+              "target_skills",
+              e.target.value.split(",").map((s) => s.trim()).filter(Boolean)
+            )
+          }
         />
       </section>
 
@@ -120,14 +164,19 @@ export default function PreferencesPage() {
           className="w-full rounded border border-gray-300 px-3 py-2"
           placeholder="comma-separated"
           value={prefs.companies.join(", ")}
-          onChange={(e) => update("companies", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+          onChange={(e) =>
+            update(
+              "companies",
+              e.target.value.split(",").map((s) => s.trim()).filter(Boolean)
+            )
+          }
         />
       </section>
 
       {/* Seniority */}
       <section className="rounded-xl border border-teal-200 bg-white p-4">
         <h2 className="font-semibold mb-2">Seniority</h2>
-        {["any","entry","mid","senior","lead","manager"].map(m => (
+        {["any", "entry", "mid", "senior", "lead", "manager"].map((m) => (
           <label key={m} className="mr-4">
             <input
               type="radio"
