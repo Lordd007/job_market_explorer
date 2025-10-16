@@ -27,7 +27,7 @@ class VerifyCodeIn(BaseModel):
 def request_code(payload: RequestCodeIn):
     email = str(payload.email).lower().strip()
     code = f"{random.randint(0, 999999):06d}"
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(dt.timezone.utc)
     expires = now + dt.timedelta(minutes=10)
 
     with SessionLocal() as db:
@@ -60,7 +60,7 @@ def request_code(payload: RequestCodeIn):
 def verify_code(payload: VerifyCodeIn):
     email = str(payload.email).lower().strip()
     code = payload.code.strip()
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(dt.timezone.utc)
 
     with SessionLocal() as db:
         row = db.execute(sql("""
