@@ -17,13 +17,11 @@ export default function ModeSelect({
   className?: string;
 }) {
   const [items, setItems] = useState<ModeRow[]>([]);
-  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    setErr(null);
     fetchJSON<ModeRow[]>("/api/modes", { min_count: 0 })
       .then(setItems)
-      .catch((e) => setErr(String(e)));
+      .catch(() => { /* noop */ });
   }, []);
 
   return (

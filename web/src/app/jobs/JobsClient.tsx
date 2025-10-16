@@ -148,14 +148,16 @@ export default function JobsClient() {
   );
 
   const items = useMemo(() => {
-    if (!resp) return [];
-    let out = [...resp.items];
+      if (!resp) return [];
+      const arr = resp.items.slice();
 
-
-    if (sort === "title") out.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sort === "company") out.sort((a, b) => a.company.localeCompare(b.company));
-    return out;  // newest = API order
-  }, [resp, sort, city]);
+      if (sort === "title") {
+        arr.sort((a, b) => a.title.localeCompare(b.title));
+      } else if (sort === "company") {
+        arr.sort((a, b) => a.company.localeCompare(b.company));
+      }
+      return arr;
+   }, [resp, sort]);
 
   // UI
   return (
