@@ -74,8 +74,8 @@ def list_jobs(
     flags AS (
       SELECT
         *,
-        (city_l ~* '\\b(remote|distributed|home\\s*based)\\b') AS has_remote_kw,
-        (city_l ~* '\\bhybrid\\b')                            AS has_hybrid_kw
+        (city_l ~* '\\y(remote|distributed|home\\s*based)\\y') AS has_remote_kw,
+        (city_l ~* '\\yhybrid\\y')                            AS has_hybrid_kw
       FROM loc_base
     ),
     step1 AS (
@@ -89,7 +89,7 @@ def list_jobs(
       SELECT
         job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description, ts,
         has_remote_kw, has_hybrid_kw,
-        REGEXP_REPLACE(s1,'^\s*(remote|hybrid|in-?office|office|distributed|home\s*based)\b\s*([-—–:,/]|to|and)?\s*', '','i') AS s2      
+        REGEXP_REPLACE(s1,'^\\s*(remote|hybrid|in-?office|office|distributed|home\\s*based)\\y\\s*([-—–:,/]|to|and)?\\s*', '','i') AS s2      
       FROM step1
     ),
     tokens AS (
@@ -121,12 +121,12 @@ def list_jobs(
           WHEN region_u<>''                                         THEN INITCAP(region_u)
           WHEN country_u<>''                                        THEN country_u
           ELSE NULL
-        END AS city_norm,
+        END::text AS city_norm,
         CASE
           WHEN remote_flag_src OR has_remote_kw THEN 'Remote'
           WHEN has_hybrid_kw                    THEN 'Hybrid'
           ELSE 'On-site'
-        END AS mode_norm,
+        END::text AS mode_norm,
         (remote_flag_src OR has_remote_kw) AS remote_flag
       FROM city_like
     ),
@@ -149,8 +149,8 @@ def list_jobs(
           )
           OR description ILIKE :skill_like
         )
-        AND (:mode_canon IS NULL OR mode_norm = :mode_canon)
-        AND (:city IS NULL OR :city = '' OR city_norm = :city)
+        AND (NULLIF(:mode_canon::text, '') IS NULL OR mode_norm = :mode_canon::text)
+        AND (NULLIF(:city::text, '')       IS NULL OR city_norm  = :city::text)
     )
     SELECT
       filtered.job_id::text           AS job_id,
