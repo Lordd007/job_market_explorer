@@ -1,8 +1,9 @@
 # api/routers/jobs.py
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import text as sql
+from sqlalchemy import text as sql, bindparam, Text, Integer
 from db.session import SessionLocal
+
 
 router = APIRouter(tags=["jobs"])
 
@@ -149,8 +150,8 @@ def list_jobs(
           )
           OR description ILIKE :skill_like
         )
-        AND (NULLIF(:mode_canon::text, '') IS NULL OR mode_norm = :mode_canon::text)
-        AND (NULLIF(:city::text, '')       IS NULL OR city_norm  = :city::text)
+        AND (NULLIF(:mode_canon, '') IS NULL OR mode_norm = :mode_canon)
+        AND (NULLIF(:city, '')       IS NULL OR city_norm  = :city)
     )
     SELECT
       filtered.job_id::text           AS job_id,
@@ -169,7 +170,15 @@ def list_jobs(
     FROM filtered
     ORDER BY filtered.ts DESC NULLS LAST
     LIMIT :limit OFFSET :offset;
-    """)
+    """).bindparams(
+    bindparam("mode_canon", type_=Text()),
+    bindparam("city",       type_=Text()),
+    bindparam("q",          type_=Text()),
+    bindparam("skill",      type_=Text()),
+    bindparam("limit",      type_=Integer()),
+    bindparam("offset",     type_=Integer()),
+    bindparam("days",       type_=Integer()),
+)
 
     rows = db.execute(
         stmt,
