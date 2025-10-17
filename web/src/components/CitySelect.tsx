@@ -22,7 +22,7 @@ export default function CitySelect({
 
   useEffect(() => {
     // tolerant to either `count` or `n`
-    fetchJSON<CityRow[]>("/api/cities", { min_count: 5, limit: 500 })
+    fetchJSON<CityRow[]>("/api/cities", { params: { min_count: 5, limit: 500 } })
       .then((rows) =>
         setItems(rows.map((r) => ({ city: r.city, n: r.n ?? r.count ?? 0 })))
       )

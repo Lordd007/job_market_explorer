@@ -19,7 +19,7 @@ export default function ModeSelect({
   const [items, setItems] = useState<ModeRow[]>([]);
 
   useEffect(() => {
-    fetchJSON<ModeRow[]>("/api/modes", { min_count: 0 })
+    fetchJSON<ModeRow[]>("/api/modes", { params: { min_count: 0 } })
       .then(setItems)
       .catch(() => { /* noop */ });
   }, []);

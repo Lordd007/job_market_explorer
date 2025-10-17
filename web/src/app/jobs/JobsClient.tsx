@@ -122,10 +122,10 @@ export default function JobsClient() {
       setLoading(true);
       setError(null);
 
-      fetchJSON<JobsResp>("/api/jobs", { q, city, mode, skill, days, page, page_size: 20 }) // add mode
-        .then((data) => { if (!ac.signal.aborted) setResp(data); })
-        .catch((e) => { if (!ac.signal.aborted) setError(String(e)); })
-        .finally(() => { if (!ac.signal.aborted) setLoading(false); });
+      fetchJSON<JobsResp>("/api/jobs", {  params: { q, city, mode, skill, days, page, page_size: 20 },})
+        .then((data) => setResp(data))
+        .catch((e) => setError(String(e)))
+        .finally(() => setLoading(false));
 
       return () => ac.abort();
     }, [q, city, mode, skill, days, page]);
@@ -134,8 +134,8 @@ export default function JobsClient() {
   useEffect(() => {
     if (!skill || skill.length < 2) { setSuggest([]); return; }
     const t = setTimeout(() => {
-      fetchJSON<string[]>("/api/skills/suggest", { term: skill })
-        .then(setSuggest)
+      fetchJSON<string[]>("/api/skills/suggest", {params: { term: skill },
+      }).then(setSuggest);
         .catch(() => setSuggest([]));
     }, 200);
     return () => clearTimeout(t);

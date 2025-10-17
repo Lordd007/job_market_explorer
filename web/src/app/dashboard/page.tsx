@@ -22,7 +22,8 @@ export default function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     setErr(null);
-    fetchJSON<Skill[]>("/api/skills/top", { limit: 10, days: 90 })
+    // NEW: params go under { params: {...} }
+    fetchJSON<Skill[]>("/api/skills/top", { params: { limit: 10, days: 90 } })
       .then(setSkills)
       .catch((e) => setErr(String(e)))
       .finally(() => setLoading(false));
@@ -37,19 +38,26 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <CitySelect value={city} onChange={setCity} />
+          {/* City – dynamic (from /api/cities) */}
+          <div className="flex flex-col">
+            <label className="text-sm opacity-70">City</label>
+            <CitySelect value={city} onChange={setCity} />
+          </div>
+
+          {/* Skill input for salary tile */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">Skill:</span>
+            <span className="text-sm opacity-70">Skill:</span>
             <input
               value={skillQuery}
               onChange={(e) => setSkillQuery(e.target.value)}
-              className="rounded-md border border-neutral-700 bg-neutral-900/40 px-2 py-1"
+              className="rounded border border-teal-200 bg-white px-3 py-2 text-slate-900"
               placeholder="python"
             />
           </div>
+
           <Link
             href="/jobs"
-            className="inline-flex items-center rounded border border-neutral-700 px-3 py-2 hover:bg-neutral-900"
+            className="inline-flex items-center rounded border border-teal-300 px-3 py-2 hover:bg-teal-50"
             title="Go to Job Search"
           >
             🔎 Browse Jobs
@@ -57,30 +65,42 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Tiles */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Rising skills can now (optionally) take a city; it's OK to pass undefined */}
         <RisingSkillsCard city={city} />
+        {/* Salary card accepts { skill, city? } */}
         <SalaryCard skill={skillQuery} city={city} />
       </div>
 
+      {/* Table: Top skills (90 days) */}
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Top Skills (last 90 days)</h2>
 
-        {err && <div className="text-red-400">Error: {err}</div>}
+        {err && <div className="text-red-500">Error: {err}</div>}
         {loading && <div className="opacity-70">Loading…</div>}
 
         {!loading && !err && (
-          <table className="min-w-full border border-neutral-700">
-            <thead className="bg-neutral-900/50">
+          <table className="min-w-full border border-teal-200 bg-white">
+            <thead className="bg-teal-50">
               <tr>
-                <th className="px-4 py-2 text-left border border-neutral-800">Skill</th>
-                <th className="px-4 py-2 text-left border border-neutral-800">Count</th>
+                <th className="px-4 py-2 text-left border border-teal-200">
+                  Skill
+                </th>
+                <th className="px-4 py-2 text-left border border-teal-200">
+                  Count
+                </th>
               </tr>
             </thead>
             <tbody>
               {skills.map((s) => (
-                <tr key={s.skill} className="hover:bg-neutral-900/40">
-                  <td className="px-4 py-2 border border-neutral-800">{s.skill}</td>
-                  <td className="px-4 py-2 border border-neutral-800">{s.cnt}</td>
+                <tr key={s.skill} className="hover:bg-teal-50">
+                  <td className="px-4 py-2 border border-teal-200">
+                    {s.skill}
+                  </td>
+                  <td className="px-4 py-2 border border-teal-200">
+                    {s.cnt}
+                  </td>
                 </tr>
               ))}
               {skills.length === 0 && (
