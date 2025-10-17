@@ -17,17 +17,19 @@ def get_db():
 def list_jobs(
     q: str = Query("", description="Free-text search over title/company/desc/url"),
     city: str | None = Query(None, description="Normalized city (e.g., 'Remote, US', 'London, UK')"),
-    mode: str | None = Query(None, description="'Remote' | 'Hybrid' | 'On-site'|'In-Office'"),
+    mode: str | None = Query(None, description="'Remote' | 'Hybrid' | 'On-site' | 'In-Office'"),
     skill: str = Query("", description="Simple contains match on description or job_skills.skill"),
     days: int = Query(90, ge=1, le=3650),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
-    Filters and returns jobs with normalized city + mode logic aligned to /api/cities and /api/modes.
+    Jobs with normalized city + mode; respects Mode and City filters
+    and returns newest first.
     """
-    # Canonicalize mode (UI sometimes says "In-Office")
+
+    # Canonicalize Mode from UI strings
     mode_canon = None
     if mode:
         m = mode.strip().lower()
@@ -38,16 +40,12 @@ def list_jobs(
         elif m == "hybrid":
             mode_canon = "Hybrid"
 
-    # Build wildcard params once
     q_like = f"%{q.strip()}%" if q else "%"
     skill_like = f"%{skill.strip()}%" if skill else "%"
-
-    # OFFSET
     offset = (page - 1) * page_size
 
-    # NOTE: replace column names if yours differ.
     stmt = sql("""
-    WITH base AS (  -- restrict by time first (no COALESCE here)
+    WITH base AS (
       SELECT
         j.job_id,
         j.title,
@@ -58,17 +56,16 @@ def list_jobs(
         j.posted_at,
         j.created_at,
         j.url,
-        COALESCE(j.remote_flag, false) AS remote_flag_src,
-        COALESCE(j.description_text, '') AS description
+        COALESCE(j.remote_flag, false)         AS remote_flag_src,
+        COALESCE(j.description_text, '')       AS description,
+        /* single “newest” sort key (uses posted_at first, then created_at) */
+        COALESCE(j.posted_at, j.created_at)    AS ts
       FROM jobs j
-      WHERE
-        (j.posted_at IS NOT NULL AND j.posted_at >= (NOW() - (:days || ' days')::interval))
-        OR
-        (j.posted_at IS NULL AND j.created_at >= (NOW() - (:days || ' days')::interval))
+      WHERE COALESCE(j.posted_at, j.created_at) >= (NOW() - (:days || ' days')::interval)
     ),
     loc_base AS (
       SELECT
-        job_id, title, company, city, region, country, posted_at, created_at, url, remote_flag_src, description,
+        job_id, title, company, city, region, country, posted_at, created_at, url, remote_flag_src, description, ts,
         LOWER(COALESCE(city,''))   AS city_l,
         UPPER(COALESCE(region,'')) AS region_u,
         CASE WHEN UPPER(COALESCE(country,''))='GB' THEN 'UK' ELSE UPPER(COALESCE(country,'')) END AS country_u
@@ -78,32 +75,31 @@ def list_jobs(
       SELECT
         *,
         (city_l ~* '\\b(remote|distributed|home\\s*based)\\b') AS has_remote_kw,
-        (city_l ~* '\\bhybrid\\b') AS has_hybrid_kw
+        (city_l ~* '\\bhybrid\\b')                            AS has_hybrid_kw
       FROM loc_base
     ),
     step1 AS (
       SELECT
-        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description,
+        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description, ts,
         has_remote_kw, has_hybrid_kw,
-        REGEXP_REPLACE(city_l, '\s*\((remote|hybrid|in-?office|distributed|home\s*based)\)\s*$', '', 'i') AS s1
+        REGEXP_REPLACE(city_l, '\\s*\\((?:remote|hybrid|in-?office|distributed|home\\s*based)\\)\\s*$', '', 'i') AS s1
       FROM flags
     ),
     step2 AS (
       SELECT
-        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description,
+        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description, ts,
         has_remote_kw, has_hybrid_kw,
         REGEXP_REPLACE(
           s1,
-          '^\s*(remote|hybrid|in-?office|office|distributed|home\s*based)\b\s*([-—–:,/]|to|and)?\s*',
+          '^\\s*(?:remote|hybrid|in-?office|office|distributed|home\\s*based)\\b\\s*(?:[-—–:,/]|to|and)?\\s*',
           '',
           'i'
         ) AS s2
-
       FROM step1
     ),
     tokens AS (
       SELECT
-        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description,
+        job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description, ts,
         has_remote_kw, has_hybrid_kw,
         NULLIF(TRIM(SUBSTRING(s2 FROM '^[^,;/|]+')), '') AS ccity_raw
       FROM step2
@@ -119,7 +115,7 @@ def list_jobs(
     ),
     norm AS (
       SELECT
-        job_id, title, company, posted_at, created_at, url, region_u, country_u, description,
+        job_id, title, company, posted_at, created_at, url, region_u, country_u, description, ts,
         CASE
           WHEN is_city AND country_u='US' AND region_u ~ '^[A-Z]{2}$' THEN INITCAP(ccity_raw) || ', ' || region_u
           WHEN is_city AND country_u<>''                             THEN INITCAP(ccity_raw) || ', ' || country_u
@@ -153,19 +149,21 @@ def list_jobs(
         AND (:city IS NULL OR :city = '' OR city_norm = :city)
     )
     SELECT
-      job_id::text AS job_id,
-      title,
-      company,
+      filtered.job_id::text           AS job_id,
+      filtered.title,
+      filtered.company,
+      /* return original vendor strings for display */
       (SELECT city    FROM jobs j2 WHERE j2.job_id = filtered.job_id) AS city,
       (SELECT region  FROM jobs j2 WHERE j2.job_id = filtered.job_id) AS region,
       (SELECT country FROM jobs j2 WHERE j2.job_id = filtered.job_id) AS country,
-      posted_at,
-      created_at,
-      url,
-      remote_flag,
-      COUNT(*) OVER()::int AS total
+      filtered.posted_at,
+      filtered.created_at,
+      (SELECT url FROM jobs j2 WHERE j2.job_id = filtered.job_id)     AS url,
+      filtered.remote_flag,
+      COUNT(*) OVER()::int AS total,
+      filtered.ts            -- DEBUG: keep to prove sorting key exists
     FROM filtered
-    ORDER BY posted_at DESC NULLS LAST, created_at DESC  -- << newest
+    ORDER BY filtered.ts DESC NULLS LAST
     LIMIT :limit OFFSET :offset;
     """)
 
@@ -200,5 +198,4 @@ def list_jobs(
         }
         for r in rows
     ]
-
     return {"total": total, "page": page, "page_size": page_size, "items": items}
