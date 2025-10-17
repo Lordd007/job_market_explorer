@@ -82,19 +82,14 @@ def list_jobs(
       SELECT
         job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description, ts,
         has_remote_kw, has_hybrid_kw,
-        REGEXP_REPLACE(city_l, '\\s*\\((?:remote|hybrid|in-?office|distributed|home\\s*based)\\)\\s*$', '', 'i') AS s1
+        REGEXP_REPLACE(city_l, '\s*\((remote|hybrid|in-?office|distributed|home\s*based)\)\s*$', '', 'i') AS s1
       FROM flags
     ),
     step2 AS (
       SELECT
         job_id, title, company, region_u, country_u, posted_at, created_at, url, remote_flag_src, description, ts,
         has_remote_kw, has_hybrid_kw,
-        REGEXP_REPLACE(
-          s1,
-          '^\\s*(?:remote|hybrid|in-?office|office|distributed|home\\s*based)\\b\\s*(?:[-—–:,/]|to|and)?\\s*',
-          '',
-          'i'
-        ) AS s2
+        REGEXP_REPLACE(s1,'^\s*(remote|hybrid|in-?office|office|distributed|home\s*based)\b\s*([-—–:,/]|to|and)?\s*', '','i') AS s2      
       FROM step1
     ),
     tokens AS (
