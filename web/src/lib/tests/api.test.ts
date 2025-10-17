@@ -3,7 +3,6 @@ import { fetchJSON, apiUrl } from "../api";
 
 declare global {
   // keep TS happy when we stub fetch
-  // eslint-disable-next-line no-var
   var fetch: jest.Mock;
 }
 

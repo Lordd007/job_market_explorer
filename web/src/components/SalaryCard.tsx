@@ -11,7 +11,9 @@ export default function SalaryCard({ skill, city }: { skill: string; city?: stri
 
   useEffect(() => {
     let mounted = true;
-    fetchJSON<SalaryRow>("/api/metrics/salary_by_skill", { skill, city: city || undefined })
+    if (!skill) { setData(null); return; }
+
+    fetchJSON<SalaryRow>("/api/metrics/salary_by_skill", {  params: { skill, city: city || undefined }})
       .then(d => mounted && setData(d))
       .catch(e => mounted && setErr(String(e)));
     return () => { mounted = false; };
