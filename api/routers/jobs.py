@@ -137,7 +137,16 @@ def list_jobs(
         (:q = '' OR title ILIKE :q_like OR company ILIKE :q_like OR description ILIKE :q_like OR url ILIKE :q_like)
         AND (
           :skill = ''
-          OR EXISTS (SELECT 1 FROM job_skills js WHERE js.job_id = norm.job_id AND js.skill ILIKE :skill_like)
+          OR EXISTS (
+          SELECT 1 FROM job_skills js 
+          JOIN skills s ON s.skill_id = js.skill_id
+          WHERE js.job_id = norm.job_id 
+            AND (
+            s.name_canonical ILIKE :skill_like
+            OR s.category ILIKE :skill_like
+            OR s.aliases_json::text ILIKE :skill_like
+            )
+          )
           OR description ILIKE :skill_like
         )
         AND (:mode_canon IS NULL OR mode_norm = :mode_canon)
