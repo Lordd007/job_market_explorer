@@ -55,7 +55,7 @@ def cities(
     step1 AS (
       SELECT
         /* remove trailing "(Remote|Hybrid|...)" */
-        REGEXP_REPLACE(city_l, '\\s*\\((?:remote|hybrid|in-?office|distributed|home\\s*based)\\)\\s*$', '', 'i') AS s1,
+        REGEXP_REPLACE(city_l, '\s*\((remote|hybrid|in-?office|distributed|home\s*based)\)\s*$', '', 'i') AS s1,
         region_u, country_u, has_remote_kw
       FROM flags
     ),
@@ -64,7 +64,7 @@ def cities(
         /* remove leading mode tokens + separators ONLY (keep the city after it) */
         REGEXP_REPLACE(
           s1,
-          '^\\s*(?:remote|hybrid|in-?office|office|distributed|home\\s*based)\\b\\s*(?:[-—–:,/]|to|and)?\\s*',
+          '^\s*(remote|hybrid|in-?office|office|distributed|home\s*based)\b\s*([-—–:,/]|to|and)?\s*',
           '',
           'i'
         ) AS s2,

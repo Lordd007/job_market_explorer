@@ -18,30 +18,29 @@ export default function CitySelect({
   placeholder = "All",
   className = "",
 }: Props) {
-  const [items, setItems] = useState<CityRow[]>([]);
+  const [items, setItems] = useState<{ city: string; n: number }[]>([]);
 
   useEffect(() => {
     // tolerant to either `count` or `n`
     fetchJSON<CityRow[]>("/api/cities", { min_count: 5, limit: 500 })
-      .then(setItems)
+      .then((rows) =>
+        setItems(rows.map((r) => ({ city: r.city, n: r.n ?? r.count ?? 0 })))
+      )
       .catch(() => setItems([]));
   }, []);
 
   return (
     <select
-      value={value ?? ""}                               // keep "" for "All"
+      value={value || ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       className={`rounded border border-teal-200 px-3 py-2 bg-white text-slate-900 ${className}`}
     >
       <option value="">{placeholder}</option>
-      {items.map((r) => {
-        const cnt = r.count ?? r.n ?? 0;
-        return (
-          <option key={r.city} value={r.city}>
-            {r.city}{cnt ? ` (${cnt})` : ""}
-          </option>
-        );
-      })}
+      {items.map((r) => (
+        <option key={r.city} value={r.city}>
+          {r.city} {r.n ? `(${r.n})` : ""}
+        </option>
+      ))}
     </select>
   );
 }

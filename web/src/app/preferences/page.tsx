@@ -27,10 +27,13 @@ export default function PreferencesPage() {
 
   // load cities list (dynamic)
   useEffect(() => {
-    fetchJSON<{ city: string; n: number }[]>("/api/cities")
-      .then(setCities)
+    fetchJSON<{ city: string; count?: number; n?: number }[]>("/api/cities")
+      .then((rows) =>
+        setCities(rows.map((r) => ({ city: r.city, n: r.n ?? r.count ?? 0 })))
+      )
       .catch(() => setCities([]));
   }, []);
+
 
   // load existing prefs (server if token, else local)
   useEffect(() => {
@@ -42,7 +45,9 @@ export default function PreferencesPage() {
       setMsg("Not logged in — changes will be saved locally.");
       return;
     }
-    fetchJSON<Prefs>("/api/user/preferences", {}, { authorization: `Bearer ${t}` })
+    fetchJSON<Prefs>("/api/user/preferences", {
+      headers: { authorization: `Bearer ${t}` },
+    })
       .then((p) => {
         setPrefs({ ...DEFAULTS, ...p });
         setMsg(null);
@@ -71,11 +76,11 @@ export default function PreferencesPage() {
         setMsg("Saved locally (not logged in).");
         return;
       }
-      await fetchJSON("/api/user/preferences", {}, {
-        authorization: `Bearer ${t}`,
-        method: "PUT",
-        json: prefs,
-      });
+      await fetchJSON("/api/user/preferences", {
+          method: "PUT",
+          json: prefs,
+          headers: { authorization: `Bearer ${t}` }
+       });
       setMsg("Saved to server.");
     } catch {
       saveLocal(prefs);
@@ -126,7 +131,7 @@ export default function PreferencesPage() {
 
       {/* Remote mode */}
       <section className="rounded-xl border border-teal-200 bg-white p-4">
-        <h2 className="font-semibold mb-2">Remote/Onsite</h2>
+        <h2 className="font-semibold mb-2">Remote/On-site</h2>
         {["any", "remote", "hybrid", "office"].map((m) => (
           <label key={m} className="mr-4">
             <input
