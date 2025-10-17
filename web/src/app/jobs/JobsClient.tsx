@@ -135,7 +135,7 @@ export default function JobsClient() {
     if (!skill || skill.length < 2) { setSuggest([]); return; }
     const t = setTimeout(() => {
       fetchJSON<string[]>("/api/skills/suggest", {params: { term: skill },
-      }).then(setSuggest);
+      }).then(setSuggest)
         .catch(() => setSuggest([]));
     }, 200);
     return () => clearTimeout(t);
