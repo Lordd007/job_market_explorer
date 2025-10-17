@@ -1,0 +1,46 @@
+name: API Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: ["api/**", "db/**", "ingest/**", ".github/workflows/api-smoke.yml"]
+  schedule:
+    # quick daily ping
+    - cron: "17 5 * * *"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      SMOKE_API_BASE: ${{ secrets.SMOKE_API_BASE }}
+    steps:
+      - name: Show target
+        run: echo "SMOKE_API_BASE=$SMOKE_API_BASE"
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y curl jq
+
+      - name: Health
+        run: |
+          set -e
+          curl -sSf "${SMOKE_API_BASE}/health" | jq .
+      - name: Jobs list (page 1)
+        run: |
+          set -e
+          curl -sSf "${SMOKE_API_BASE}/api/jobs?page=1&page_size=1" | jq .
+      - name: Cities (top 5)
+        run: |
+          set -e
+          curl -sSf "${SMOKE_API_BASE}/api/cities?min_count=1&limit=5" | jq .
+
+      # Optional sanity for skills/rising & salary (won’t fail the build)
+      - name: Optional – rising skills
+        continue-on-error: true
+        run: |
+          curl -s "${SMOKE_API_BASE}/api/skills/rising?weeks=2&baseline_weeks=2&min_support=10" | jq .
+
+      - name: Optional – salary for Go
+        continue-on-error: true
+        run: |
+          curl -s "${SMOKE_API_BASE}/api/metrics/salary_by_skill?skill=go" | jq .
