@@ -2,7 +2,7 @@
 import asyncio
 import re
 from datetime import datetime, timedelta
-from typing import Iterable, List, Dict, Any, Optional, Tuple
+from typing import Iterable, List, Dict, Any, Optional
 import os
 import httpx
 from bs4 import BeautifulSoup
@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import insert
 from utils.seniority import infer_seniority
 from utils.salary import normalize_salary
+from ingest.location_utils import normalize_location
 
 HEADERS = {"User-Agent": "JobMarketExplorer/0.1 (academic/portfolio use)"}
 CONCURRENCY = 8
@@ -89,11 +90,15 @@ async def enrich_job_html(client: httpx.AsyncClient, job_stub: Dict[str, Any]) -
     soup = BeautifulSoup(html, "html.parser")
     desc = soup.get_text(separator="\n", strip=True)
     loc_el = soup.select_one(".location, .job-location, [data-qa='job-location']")
-    city = loc_el.get_text(strip=True) if loc_el else "N/A"
+    loc_text = loc_el.get_text(strip=True) if loc_el else None
+    city, region, country = normalize_location(loc_text)
     return {
         **job_stub,
         "description_text": desc[:200000],
         "city": city,
+        "region": region,
+        "country": country,
+        "location": loc_text,
         "posted_at": _parse_posted_at(soup),
     }
 
@@ -118,7 +123,7 @@ async def greenhouse_company_jobs(client: httpx.AsyncClient, company_slug: str, 
             continue
 
         loc = (j.get("location") or {}).get("name") or ""
-        city = (loc.split(",")[0].strip() if loc else None) or None
+        city, region, country = normalize_location(loc)
 
         out.append({
             "title": j.get("title", "").strip(),
@@ -128,6 +133,9 @@ async def greenhouse_company_jobs(client: httpx.AsyncClient, company_slug: str, 
             "description_text": (j.get("content") or "")[:200000],
             "url": j.get("absolute_url"),
             "city": city or "N/A",
+            "region": region,
+            "country": country,
+            "location": loc,
             "posted_at": posted_dt,
             "source": f"greenhouse:{company_slug}",
         })
@@ -148,13 +156,16 @@ async def lever_company_jobs(client: httpx.AsyncClient, company_slug: str, days:
         if posted_dt and posted_dt < cutoff:
             continue
         loc = (j.get("categories") or {}).get("location") or ""
-        city = (loc.split(",")[0].strip() if loc else None) or None
+        city, region, country = normalize_location(loc)
         out.append({
             "title": j.get("text", "").strip(),
             "company": (j.get("categories") or {}).get("team") or "Unknown",
             "description_text": (j.get("descriptionPlain") or j.get("description") or "")[:200000],
             "url": j.get("hostedUrl"),
             "city": city or "N/A",
+            "region": region,
+            "country": country,
+            "location": loc,
             "posted_at": posted_dt,
             "source": f"lever:{company_slug}",
         })
@@ -251,10 +262,16 @@ def save_to_db(items, db: Optional[Session] = None) -> int:
                     existing.desc_hash = desc_bin
                 continue
 
+            norm_city, norm_region, norm_country = normalize_location(
+                it.get("location"), it.get("city"), it.get("region"), it.get("country")
+            )
+
             job = Job(
                 title=it["title"],
                 company=it["company"],
-                city=it.get("city"),
+                city=norm_city or "N/A",
+                region=norm_region or "N/A",
+                country=norm_country or "N/A",
                 posted_at=it.get("posted_at"),
                 source=it.get("source", "crawl"),
                 url=it.get("url"),
