@@ -1,6 +1,7 @@
 # tests/conftest.py
 import os
 import pathlib
+from urllib.parse import urlparse
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -38,6 +39,18 @@ def alembic_cfg() -> AlembicConfig:
 
 @pytest.fixture(scope="session", autouse=True)
 def run_migrations(alembic_cfg):
+    u = urlparse(TEST_DB_URL)
+    assert u.hostname in {"localhost", "127.0.0.1", "::1", "postgres"}, (
+        f"Unsafe host for destructive reset: {u.hostname}"
+    )
+    assert u.path.endswith("/jme_test"), f"Unsafe DB name for destructive reset: {u.path}"
+
+    engine = create_engine(TEST_DB_URL, future=True)
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+        conn.execute(text("CREATE SCHEMA public;"))
+        conn.execute(text("GRANT ALL ON SCHEMA public TO public;"))
+
     command.upgrade(alembic_cfg, "head")
     yield
     # Optional teardown
