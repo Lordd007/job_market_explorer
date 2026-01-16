@@ -28,6 +28,20 @@ jobs:
   tests:
     name: Tests (API)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jme
+          POSTGRES_PASSWORD: jme
+          POSTGRES_DB: jme_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U jme -d jme_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -46,6 +60,17 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
-      - name: Run pytest
-        run: pytest -q  || true    # ← no '|| true' so CI fails on failing tests
+      - name: Wait for Postgres
+        env:
+          PGPASSWORD: jme
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          until pg_isready -h localhost -p 5432 -U jme -d jme_test; do
+            sleep 2
+          done
 
+      - name: Run pytest
+        env:
+          DATABASE_URL: postgresql+psycopg://jme:jme@localhost:5432/jme_test
+        run: pytest -q
