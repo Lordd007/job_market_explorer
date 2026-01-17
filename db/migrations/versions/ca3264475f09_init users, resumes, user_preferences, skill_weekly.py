@@ -63,24 +63,7 @@ def upgrade():
         sa.ForeignKeyConstraint(["user_id"], ["users.user_id"], ondelete="CASCADE"),
     )
 
-    # skill_weekly (rollup)
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")  # safe now for future stages
-    op.create_table(
-        "skill_weekly",
-        sa.Column("week_date", sa.Date(), nullable=False),
-        sa.Column("city", sa.Text(), nullable=True),
-        sa.Column("skill_id", sa.Integer(), nullable=False),
-        sa.Column("postings", sa.Integer(), nullable=False),
-        sa.PrimaryKeyConstraint("week_date", "city", "skill_id"),
-        sa.ForeignKeyConstraint(["skill_id"], ["skills.skill_id"], ondelete="CASCADE"),
-    )
-    op.create_index("skill_weekly_skill_idx", "skill_weekly", ["skill_id"], unique=False)
-    op.create_index("skill_weekly_week_idx", "skill_weekly", ["week_date"], unique=False)
-
 def downgrade():
-    op.drop_index("skill_weekly_week_idx", table_name="skill_weekly")
-    op.drop_index("skill_weekly_skill_idx", table_name="skill_weekly")
-    op.drop_table("skill_weekly")
     op.drop_table("user_preferences")
     op.drop_table("resume_skills")
     op.drop_table("resumes")
