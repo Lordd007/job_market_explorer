@@ -23,6 +23,7 @@ def _ensure_bytes(x) -> bytes:
         return bytes(x)
     if isinstance(x, str):
         s = x.strip()
+        s = s.removeprefix("0x")
         try:
             return bytes.fromhex(s)
         except ValueError:
