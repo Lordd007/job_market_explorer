@@ -43,12 +43,12 @@ def run():
             if not url:
                 continue
 
-            # ✅ idempotent: skip if URL already exists
+            
             exists = db.query(Job).filter_by(url=url).first()
             if exists:
                 continue
 
-            # This returns str today; we convert to bytes for BYTEA.
+            
             h = text_hash(it.get("title"), it.get("company"), it.get("description_text"))
             desc_hash_bytes = _ensure_bytes(h)
 
